@@ -1,0 +1,235 @@
+/* Rolling — six dice, make a hand, reach the target. Night theme only. */
+
+/* ---------- theme ---------- */
+:root {
+  --felt-hi: #1d3024; --felt-lo: #0b1410;
+  --ink: #e8e4d9; --ink-dim: rgba(232, 228, 217, .62); --edge: rgba(232, 228, 217, .3);
+  --gold: #cdbb72; --red: #d0674a;
+  --die-face: #ece5d3; --die-pip: #262018;
+}
+
+/* ---------- base ---------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  height: 100vh; overflow: hidden; font-family: Georgia, 'Times New Roman', serif;
+  color: var(--ink); user-select: none; touch-action: none; cursor: default;
+  background: radial-gradient(120% 90% at 50% 32%, var(--felt-hi), var(--felt-lo) 78%);
+}
+body::before {  /* felt grain */
+  content: ""; position: fixed; inset: 0; z-index: 6; pointer-events: none; opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body::after {  /* lamp vignette */
+  content: ""; position: fixed; inset: 0; z-index: 7; pointer-events: none;
+  box-shadow: inset 0 0 150px 40px rgba(0, 0, 0, .42);
+}
+.table { height: 100%; display: flex; flex-direction: column; padding: 16px 26px 18px; }
+
+/* ---------- hud ---------- */
+.hud { display: flex; justify-content: space-between; align-items: baseline; }
+.brand { font-size: 21px; letter-spacing: .22em; }
+.hud-right { display: flex; gap: 8px; }
+.ghost {
+  font-family: inherit; font-size: 12px; letter-spacing: .12em; padding: 4px 12px;
+  background: none; border: 1px solid var(--edge); color: var(--ink-dim); cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.ghost:hover { color: var(--ink); border-color: var(--ink); }
+.ghost.gold { color: var(--gold); border-color: var(--gold); }
+
+/*
+ * Information Design — Variant 01, "One Left Rail":
+ * the default build scatters the game's numbers — a scorebar up top, a
+ * table of hands on the right. This variant gathers everything into a
+ * single column on the left, Balatro-style: score, meters and glossary
+ * stacked top to bottom, so the stage keeps the whole remaining width.
+ * One rail, one glance, and the dice stay the hero of the screen.
+ */
+/* ---------- left rail: score, meters and glossary stacked in one column ---------- */
+.combos {
+  width: 252px; flex: none; display: flex; flex-direction: column; gap: 20px;
+  border-right: 1px solid var(--edge); padding: 6px 22px 0 0;
+}
+.combos .cap { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--ink-dim); }
+.rail-score { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.rail-score .cap { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--ink-dim); }
+.rail-score .big { font-size: 54px; line-height: 1; letter-spacing: .02em; }
+.rail-score .target { font-size: 16px; font-style: italic; color: var(--gold); letter-spacing: .06em; }
+/* target progress — thin bar under the big score */
+.progress { width: 100%; height: 4px; background: var(--edge); overflow: hidden; }
+.progress .fill { height: 100%; width: 0; background: var(--gold); transition: width .25s ease; }
+.rail-meta { display: flex; gap: 26px; padding-bottom: 16px; border-bottom: 1px solid var(--edge); }
+.meta { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.meta .cap { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-dim); }
+.meta .mval { font-size: 24px; line-height: 1; }
+/* the variant tag — this build's one-line manifesto */
+.variant-tag {
+  position: fixed; left: 26px; bottom: 10px; z-index: 1;
+  font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink-dim) 60%, transparent);
+}
+
+/* ---------- main layout ---------- */
+.main { flex: 1; min-height: 0; display: flex; gap: 30px; margin-top: 6px; }
+.stage { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* the variant tag — this build's one-line manifesto */
+.variant-tag {
+  position: fixed; left: 26px; bottom: 10px; z-index: 1;
+  font-size: 9px; letter-spacing: .2em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink-dim) 60%, transparent);
+}
+
+/* ---------- dice ---------- */
+.dice { display: flex; gap: 26px; margin-bottom: 26px; flex-wrap: wrap; justify-content: center; }
+.die-wrap { position: relative; }
+.die {
+  width: 76px; height: 76px; border-radius: 14px; cursor: pointer;
+  background: linear-gradient(145deg, var(--die-face), color-mix(in srgb, var(--die-face) 86%, #000));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -4px 6px rgba(0, 0, 0, .18), 0 6px 14px rgba(0, 0, 0, .35);
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 13%;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.pip { border-radius: 50%; }
+.shadow {
+  position: absolute; left: 12%; bottom: -14px; width: 76%; height: 10px;
+  border-radius: 50%; background: #000; opacity: .55; filter: blur(4px);
+}
+/* which pips show per face */
+.die[data-v="1"] .pip:nth-child(5),
+.die[data-v="2"] .pip:nth-child(3), .die[data-v="2"] .pip:nth-child(7),
+.die[data-v="3"] .pip:nth-child(3), .die[data-v="3"] .pip:nth-child(5), .die[data-v="3"] .pip:nth-child(7),
+.die[data-v="4"] .pip:nth-child(1), .die[data-v="4"] .pip:nth-child(3), .die[data-v="4"] .pip:nth-child(7), .die[data-v="4"] .pip:nth-child(9),
+.die[data-v="5"] .pip:nth-child(1), .die[data-v="5"] .pip:nth-child(3), .die[data-v="5"] .pip:nth-child(5), .die[data-v="5"] .pip:nth-child(7), .die[data-v="5"] .pip:nth-child(9),
+.die[data-v="6"] .pip:nth-child(1), .die[data-v="6"] .pip:nth-child(3), .die[data-v="6"] .pip:nth-child(4), .die[data-v="6"] .pip:nth-child(6), .die[data-v="6"] .pip:nth-child(7), .die[data-v="6"] .pip:nth-child(9)
+{ background: var(--die-pip); }
+/* hover: a small lift — selected dice keep their bigger one (rule below wins) */
+.die:hover { transform: translateY(-5px); }
+/* selected: lifted, red ring */
+.die.sel {
+  transform: translateY(-12px);
+  box-shadow: 0 0 0 3px var(--red), 0 14px 22px rgba(0, 0, 0, .45),
+              inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -4px 6px rgba(0, 0, 0, .18);
+}
+.die.fired { animation: fire .5s ease; }
+@keyframes fire {
+  30% { transform: translateY(-16px) scale(1.08); }
+  100% { transform: translateY(-12px); }
+}
+/* shake: hold tiers, faster and faster */
+.die-wrap.w1 .die { animation: wob .17s linear infinite; }
+.die-wrap.w2 .die { animation: wob .12s linear infinite; }
+.die-wrap.w3 .die { animation: wob .085s linear infinite; }
+.die-wrap.w3 .shadow { animation: wobsh .17s linear infinite; }
+@keyframes wob {
+  0% { transform: rotate(0) translateY(0); } 25% { transform: rotate(-6deg) translateY(-3px); }
+  50% { transform: rotate(5deg) translateY(-1px); } 75% { transform: rotate(-4deg) translateY(-2px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+@keyframes wobsh { 50% { transform: scaleX(.8); opacity: .38; } }
+/* roll: hop while faces swap underneath */
+.die-wrap.rolling .die { animation: hop .8s cubic-bezier(.36, .5, .4, 1); }
+.die-wrap.rolling .shadow { animation: shpulse .8s cubic-bezier(.36, .5, .4, 1); }
+@keyframes hop {
+  0% { transform: translateY(0) rotate(0); }
+  18% { transform: translateY(-52px) rotate(70deg) scale(1.05); }
+  38% { transform: translateY(4px) rotate(160deg); }
+  55% { transform: translateY(-24px) rotate(235deg) scale(1.02); }
+  74% { transform: translateY(2px) rotate(315deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+@keyframes shpulse {
+  0% { transform: scaleX(1); opacity: .55; }
+  18% { transform: scaleX(.5); opacity: .18; }
+  38% { transform: scaleX(1.05); opacity: .6; }
+  55% { transform: scaleX(.68); opacity: .3; }
+  74% { transform: scaleX(1.02); opacity: .55; }
+  100% { transform: scaleX(1); opacity: .55; }
+}
+.die.settle { animation: squash .22s ease-out; }
+@keyframes squash {
+  0% { transform: scale(1.08, .84); } 55% { transform: scale(.96, 1.06); } 100% { transform: scale(1, 1); }
+}
+
+/* ---------- preview & msg ---------- */
+.preview { display: flex; align-items: baseline; gap: 16px; min-height: 44px; }
+.pname { font-size: 26px; font-style: italic; letter-spacing: .06em; }
+.pmath { font-size: 34px; letter-spacing: .04em; color: var(--gold); transition: transform .15s; }
+.pmath.hot { transform: scale(1.18); }
+.msg { min-height: 24px; margin: 10px 0 14px; font-style: italic; font-size: 14px; letter-spacing: .07em; color: var(--ink-dim); text-align: center; }
+
+/* ---------- controls ---------- */
+.controls { display: flex; align-items: center; gap: 20px; }
+.playbtn {
+  font-family: inherit; font-size: 17px; letter-spacing: .3em; padding: 12px 42px 12px 48px;
+  background: none; color: var(--ink); border: 2px solid var(--ink); cursor: pointer;
+  transition: color .2s, border-color .2s, box-shadow .2s, opacity .2s;
+}
+.playbtn:hover:not(:disabled) { color: var(--gold); border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.playbtn:disabled { opacity: .35; cursor: default; }
+.controls .hint { font-size: 11px; letter-spacing: .14em; font-style: italic; color: var(--ink-dim); }
+
+/* ---------- combo table ---------- */
+.rail-cap { margin-bottom: 10px; }
+.crow {
+  padding: 6px 8px; border-left: 2px solid transparent;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.crow-top { display: flex; justify-content: space-between; align-items: baseline; }
+.crow .cname { font-size: 13px; font-style: italic; letter-spacing: .04em; color: var(--ink-dim); }
+.crow .cmath { font-size: 12px; letter-spacing: .06em; color: var(--ink-dim); }
+/* the glossary whispers: a hand explains itself only when you look at it or play it */
+.crow .cdesc { display: none; margin-top: 1px; font-size: 10.5px; letter-spacing: .03em; color: color-mix(in srgb, var(--ink-dim) 75%, transparent); }
+.crow:hover .cdesc { display: block; }
+.crow.on .cdesc { display: block; color: var(--ink-dim); }
+.crow.on { border-left-color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.crow.on .cname { color: var(--ink); font-size: 14px; }
+.crow.on .cmath { color: var(--gold); }
+
+/* ---------- stamps ---------- */
+.stamp-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.stamp {
+  position: absolute; left: 50%; top: 30%; padding: 2px 20px;
+  font-size: 44px; letter-spacing: .16em; color: var(--red); border: 4px double var(--red);
+  background: color-mix(in srgb, var(--felt-lo) 55%, transparent);
+  animation: stampIn .45s cubic-bezier(.2, 1.4, .4, 1);
+}
+.stamp.gold { color: var(--gold); border-color: var(--gold); }
+@keyframes stampIn {
+  from { transform: translate(-50%, -50%) rotate(-7deg) scale(2.3); opacity: 0; }
+  to { transform: translate(-50%, -50%) rotate(-7deg) scale(1); opacity: 1; }
+}
+
+/* ---------- end card ---------- */
+.end {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .5s;
+}
+.end.show { opacity: 1; pointer-events: auto; }
+.end-card { background: var(--felt-lo); border: 1px solid var(--gold); outline: 1px solid var(--gold); outline-offset: 5px; padding: 36px 52px; text-align: center; }
+.end-name { font-size: 44px; font-style: italic; letter-spacing: .04em; }
+.end-best { margin: 14px 0 0; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
+.end-best span { color: var(--gold); }
+.end-stats { margin: 12px 0 24px; font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
+.end-btns { display: flex; gap: 12px; justify-content: center; }
+
+/* ---------- help card — same language as the end card, read-side up ---------- */
+.help {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .55); opacity: 0; pointer-events: none; transition: opacity .5s;
+}
+.help.show { opacity: 1; pointer-events: auto; }
+.help-card { background: var(--felt-lo); border: 1px solid var(--gold); outline: 1px solid var(--gold); outline-offset: 5px; padding: 36px 52px; max-width: 640px; text-align: left; }
+.help-name { font-size: 32px; font-style: italic; letter-spacing: .04em; color: var(--gold); }
+.help-lede { margin: 8px 0 6px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
+.help-sec { margin: 18px 0 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(205, 187, 114, .3); font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-dim); }
+.help-row { display: flex; gap: 20px; margin: 12px 0; font-size: 15.5px; line-height: 1.5; }
+.help-key { flex: 0 0 130px; text-align: right; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); padding-top: 4px; }
+.help-btns { display: flex; justify-content: center; margin-top: 22px; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 860px) {
+  .die { width: 56px; height: 56px; }
+  .dice { gap: 16px; }
+  #comboList, .rail-cap { display: none; }
+  .rail-score .big { font-size: 40px; }
+}
