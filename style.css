@@ -405,6 +405,54 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .help-key { flex: 0 0 130px; text-align: right; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); padding-top: 4px; }
 .help-btns { display: flex; justify-content: center; margin-top: 22px; }
 
+/* ---------- event feedback: one-shot classes toggled by JS ---------- */
+/* valid hand: the hand name pops, its row pulses, PLAY snaps armed */
+.pname.pop { animation: fxPop .32s cubic-bezier(.2, 1.5, .4, 1); }
+@keyframes fxPop {
+  0% { transform: scale(.82); } 55% { transform: scale(1.14); } 100% { transform: scale(1); }
+}
+.crow.pulse { animation: rowPulse .45s ease-out; }
+@keyframes rowPulse {
+  0% { background: color-mix(in srgb, var(--red) 26%, transparent); }
+  100% { background: transparent; }
+}
+.playbtn.armed { animation: armSnap .42s cubic-bezier(.2, 1.3, .4, 1); }
+@keyframes armSnap {
+  0% { transform: scale(.94); }
+  45% { transform: scale(1.05); box-shadow: 0 6px 18px rgba(0, 0, 0, .44), 0 0 34px rgba(205, 187, 114, .5), inset 0 1px 0 rgba(255, 255, 255, .14); }
+  100% { transform: scale(1); }
+}
+/* play commit: the table takes the hit, weighted by hand tier */
+.stage.impact { animation: stageHit .38s cubic-bezier(.2, .9, .3, 1); }
+.stage.fx-med.impact { animation-name: stageHitMed; }
+.stage.fx-high.impact { animation-name: stageHitHigh; }
+@keyframes stageHit {       /* low: a flinch */
+  0% { transform: translate(0, 0); } 35% { transform: translate(1px, 1px); } 100% { transform: translate(0, 0); }
+}
+@keyframes stageHitMed {    /* medium: a knock */
+  0% { transform: translate(0, 0); } 30% { transform: translate(-3px, 2px); }
+  60% { transform: translate(2px, -1px); } 100% { transform: translate(0, 0); }
+}
+@keyframes stageHitHigh {   /* high: the table jumps */
+  0% { transform: translate(0, 0); } 25% { transform: translate(-5px, 3px) rotate(-.25deg); }
+  55% { transform: translate(3px, -2px) rotate(.15deg); } 100% { transform: translate(0, 0) rotate(0); }
+}
+/* multiplier lands: one hard punch on the math */
+.pmath.punch { animation: multPunch .3s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes multPunch {
+  0% { transform: scale(1); } 40% { transform: scale(1.34); text-shadow: 0 0 34px rgba(205, 187, 114, .7); }
+  100% { transform: scale(1); }
+}
+/* score arrives: the big number bumps, the gauge flashes */
+.rail-score .big.bump { animation: scoreBump .36s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes scoreBump {
+  0% { transform: scale(1); } 35% { transform: scale(1.09); } 100% { transform: scale(1); }
+}
+.progress .fill.flash { animation: fillFlash .38s ease-out; }
+@keyframes fillFlash {
+  0% { filter: brightness(1.9); } 100% { filter: brightness(1); }
+}
+
 /* ---------- small screens ---------- */
 @media (max-width: 860px) {
   .die { width: 56px; height: 56px; }
@@ -416,6 +464,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 
 /* ---------- reduced motion: the room goes still, the game stays readable ---------- */
 @media (prefers-reduced-motion: reduce) {
-  body::after, .playbtn:not(:disabled) { animation: none; }
+  body::after, .playbtn:not(:disabled),
+  .pname.pop, .crow.pulse, .playbtn.armed, .stage.impact,
+  .pmath.punch, .rail-score .big.bump, .progress .fill.flash { animation: none; }
   .die, .shadow, .playbtn, .ghost, .crow, .meta .mval::before { transition-duration: .01s; }
 }

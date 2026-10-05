@@ -13,6 +13,7 @@ const els = {
   comboList: $('comboList'), end: $('end'), endName: $('endName'),
   endStats: $('endStats'), help: $('help'), endBest: $('endBest'),
 };
+const stageEl = document.querySelector('.stage');
 
 // ========================================
 // The Economy
@@ -109,6 +110,21 @@ function renderPreview() {
   els.pMath.textContent = chips + ' × ' + TYPES[c.key].mult;
 }
 const msg = t => els.msg.textContent = t;
+
+/* one-shot fx helpers: JS only toggles classes, the animations live in CSS */
+function fxValidHand() {   /* first lock that completes a hand: name pops, row pulses, PLAY arms */
+  els.pName.classList.remove('pop'); void els.pName.offsetWidth; els.pName.classList.add('pop');
+  later(() => els.pName.classList.remove('pop'), 350);
+  const row = document.querySelector('.crow.on');
+  if (row) { row.classList.add('pulse'); later(() => row.classList.remove('pulse'), 480); }
+  els.playBtn.classList.add('armed');
+  later(() => els.playBtn.classList.remove('armed'), 460);
+}
+function fxClear() {   /* strip every one-shot feedback class */
+  stageEl.classList.remove('fx-low', 'fx-med', 'fx-high', 'impact');
+  document.querySelectorAll('.pop, .pulse, .armed, .bump, .flash, .punch').forEach(el =>
+    el.classList.remove('pop', 'pulse', 'armed', 'bump', 'flash', 'punch'));
+}
 function stamp(text, cls = '') {
   const s = document.createElement('div');
   s.className = 'stamp ' + cls; s.textContent = text;
@@ -165,14 +181,16 @@ function currentCombo() { return detect(selected()); }
  */
 function toggleSelect(i) {
   if (!S || S.rolling || counting || S.phase !== 'PLAY') return;
-  const wasValid = !!currentCombo();
+  const before = currentCombo();
   try {
     if (S.d[i] === null) { S.d[i] = S.vals[i]; Sound.pick(S.vals[i], selected()); }
     else { S.d[i] = null; Sound.unpick(S.vals[i]); }
-    if (!wasValid && !!currentCombo()) Sound.confirm();
+    if (!before && !!currentCombo()) Sound.confirm();
     Sound.setLocks(selected());   /* locked dice take the spotlight in the bed */
   } catch (e) { /* audio must never block the game */ }
   renderDice(); renderPreview(); renderMeta();
+  const after = currentCombo();
+  if (after && (!before || before.key !== after.key)) fxValidHand();   /* new or upgraded hand */
 }
 /* die values: null = unselected, number = selected */
 function renderDice() {
@@ -270,9 +288,13 @@ function playHand(c) {
   const selIdx = [];
   S.d.forEach((v, i) => { if (v !== null) selIdx.push(i); });
 
+  const tier = t.mult >= 6 ? 'high' : t.mult >= 3 ? 'med' : 'low';   /* visual intensity tier from the multiplier */
+  stageEl.classList.add('fx-' + tier, 'impact');
+  later(() => stageEl.classList.remove('impact'), 420);
+
   try { Sound.handNotes(vals, c.key); } catch (e) { /* audio must never block the game */ }
   stamp(t.name.toUpperCase(), t.mult >= 4 ? 'gold' : '');
-  selIdx.forEach(i => dice[i].d.classList.add('fired'));
+  selIdx.forEach((i, k) => later(() => dice[i].d.classList.add('fired'), k * 60));   /* staggered ignition */
 
   /* act one: the chips count up */
   let shown = 0;
@@ -283,8 +305,8 @@ function playHand(c) {
     if (shown >= chips) {
       clearInterval(chipIv);
       try { Sound.multHit(); } catch (e) {}
-      els.pMath.classList.add('hot');
-      later(() => els.pMath.classList.remove('hot'), 500);
+      els.pMath.classList.add('punch');
+      later(() => els.pMath.classList.remove('punch'), 300);
       countScore(S.score, S.score + gain);
     }
   }, 45);
@@ -296,6 +318,9 @@ function countScore(from, to) {
     S.score = v; els.score.textContent = v; updateProgress();
     if (v >= to) {
       clearInterval(iv);
+      els.score.classList.add('bump');
+      els.prog.classList.add('flash');
+      later(() => { els.score.classList.remove('bump'); els.prog.classList.remove('flash'); }, 400);
       counting = false;
       afterPlay();
     }
@@ -307,6 +332,7 @@ function afterPlay() {
   dice.forEach(({ d }) => d.classList.remove('fired'));
   els.pName.textContent = '—'; els.pMath.textContent = '';
   document.querySelectorAll('.crow').forEach(r => r.classList.remove('on'));
+  stageEl.classList.remove('fx-low', 'fx-med', 'fx-high');
   if (S.score >= S.target) { roundClear(); return; }
   if (S.hands <= 0) { gameOver(false); return; }
   nextHand();
@@ -340,6 +366,7 @@ function newGame() {
   els.end.classList.remove('show');
   els.endBest.textContent = '';
   els.stamp.innerHTML = '';
+  fxClear();
   dice.forEach(({ d }) => { d.classList.remove('sel', 'fired'); });
   renderMeta(); renderPreview();
   nextHand();
