@@ -1,9 +1,8 @@
 /**
  * Rolling — Sound Engine, "The Looper".
- * The box samples the player: every musical event you cause — the roll's
- * chord call, each locked-die strum, the payout run — is recorded onto a
- * loop of tape and played back under the live action. Your moves become
- * the backing track; every hand records the accompaniment for the next.
+ * Player musical gestures can be committed into short loop memories
+ * that accompany later hands. Live feedback plays everything; the tape
+ * keeps only deliberate gestures — picks, the banked hand, the mult landing.
  */
 const Sound = (() => {
   let on = false, box, master, rev, mem, hatGain, bp;
@@ -42,13 +41,23 @@ const Sound = (() => {
   let chord = { root: 67, tones: [67, 74] };       /* the harmony the table is lying in */
   let motif = [67, 74, 71];                        /* the figure of the current table */
   let land = 79;                                   /* root of the last hand played — where multHit lands */
-  /* the tape: events the player caused, replayed as the accompaniment */
+  /* the tape: events the player caused, replayed as the accompaniment.
+     currentTake is the scratch for this hand; committedTakes holds the last
+     three banked hands, newest first. setBed wipes the scratch only. */
   const LOOP_LEN = 4.5;                            /* seconds of tape — short enough to feel alive */
-  let take = [], loopStart = 0;
-  function record(midi, vel) {                     /* commit a sound to the tape, at its own timing */
-    take.push({ at: (Tone.now() - loopStart) % LOOP_LEN, midi, vel: vel * 0.7 });
-    if (take.length > 24) take.shift();
+  let currentTake = [], committedTakes = [], loopStart = 0;
+  const TAKE_GAIN = [1, 0.55, 0.3];                /* newest take clearest, older ones recede */
+  function record(midi, vel) {                     /* commit a sound to the scratch take, at its own timing */
+    currentTake.push({ at: (Tone.now() - loopStart) % LOOP_LEN, midi, vel: vel * 0.7 });
+    if (currentTake.length > 24) currentTake.shift();
   }
+  function commitTake() {                          /* bank the scratch take into memory — PLAY only */
+    if (!currentTake.length) return;
+    committedTakes.unshift(currentTake);
+    if (committedTakes.length > 3) committedTakes.pop();
+    currentTake = [];
+  }
+  function resetMemory() { currentTake = []; committedTakes = []; }
 
   /* the table's harmony: straights root on their low end, everything else roots
      on the most repeated die — a pair of 4s literally re-keys the bed onto D */
@@ -109,14 +118,15 @@ const Sound = (() => {
     // ========================================
     /*
      * One loop of the player's own making, spinning under the live
-     * action. A new roll wipes the take — every hand records the
-     * accompaniment for the next one. Even when the player goes quiet,
-     * the last take keeps spinning: sparse input still gets a
-     * soundtrack, and it is always their own.
+     * action. Committed hands keep playing underneath — newest clearest,
+     * older ones fading back — while the current hand's scratch take
+     * spins on top until it is banked or wiped by the next roll.
      */
     new Tone.Loop(t => {
       loopStart = t;
-      take.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel));
+      committedTakes.forEach((tk, i) =>
+        tk.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel * TAKE_GAIN[i])));
+      currentTake.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel));
     }, LOOP_LEN).start(0);
     Tone.Transport.start();
     on = true;
@@ -125,25 +135,18 @@ const Sound = (() => {
   // ========================================
   // Feeding the Box
   // ========================================
-  /*
-   * The game calls in after every event, and everything the box says is
-   * recorded to the tape: a roll announces its new chord and starts a
-   * fresh take, two or more locked dice rewrite the figure. The player
-   * stays the composer — the tape is nothing but their own performance,
-   * played back.
-   */
-  function setBed(vals, key) {     /* after every roll: announce the chord, wipe the tape, start a new take */
+  /* Every roll announces its new chord live and starts a fresh scratch
+     take; two or more locked dice rewrite the figure. Bed notes play
+     live but are not recorded. */
+  function setBed(vals, key) {     /* after every roll: announce the chord live, wipe the scratch take */
     chord = harmony(vals, key);
     motif = boardMotif();
-    take = [];
+    currentTake = [];              /* committed memory survives the roll */
     if (!on) return;
     const t = Tone.now() + 0.02;
-    box.triggerAttackRelease(N(chord.root - 12), 0.4, t, 0.2);   /* say the new chord out loud */
-    record(chord.root - 12, 0.2);
-    chord.tones.forEach((m, i) => {
-      box.triggerAttackRelease(N(m), 0.3, t + 0.09 + i * 0.07, 0.15);
-      record(m, 0.15);
-    });
+    /* bed is heard live, not remembered — no record() here */
+    box.triggerAttackRelease(N(chord.root - 12), 0.4, t, 0.2);
+    chord.tones.forEach((m, i) => box.triggerAttackRelease(N(m), 0.3, t + 0.09 + i * 0.07, 0.15));
   }
   function setLocks(vals) {        /* two or more selected dice rewrite the figure */
     const lk = vals.map(v => PENT[v - 1]).sort((a, b) => a - b);
@@ -153,31 +156,24 @@ const Sound = (() => {
   // ========================================
   // Picking Is Playing
   // ========================================
-  /*
-   * Selecting a die strums the whole hand as a quick ascending riff —
-   * the player hears what they just did, like strumming a chord.
-   * Releasing a die drops its note an octave down, and the moment a
-   * selection becomes a valid hand, a small fifth flicks upward.
-   */
-  function pick(v, vals) {     /* selected: the whole selection rolls out as a quick ascending riff —
-                                  the player hears what they just played, like strumming a chord */
+  /* Picking strums the whole selection live, but the tape keeps only the
+     newly picked note. Releasing drops the note an octave; a new valid
+     hand flicks a fifth upward. Neither is recorded. */
+  function pick(v, vals) {     /* live: strum the whole selection; tape: only the die just picked */
     if (!on) return;
     const t = Tone.now();
     const ns = (vals && vals.length ? vals : [v]).map(x => PENT[x - 1]).sort((a, b) => a - b);
-    ns.forEach((m, i) => {
-      box.triggerAttackRelease(N(m), 0.18, t + i * 0.06, 0.24);
-      record(m, 0.24);
-    });
+    ns.forEach((m, i) => box.triggerAttackRelease(N(m), 0.18, t + i * 0.06, 0.24));
+    record(PENT[v - 1], 0.24);
   }
   function unpick(v) {         /* released: softer, an octave down */
     if (!on) return;
     box.triggerAttackRelease(N(PENT[v - 1] - 12), 0.1, Tone.now(), 0.12);
   }
-  function confirm() {
+  function confirm() {             /* UI flick — heard live, never taped */
     if (!on) return; const t = Tone.now();
     box.triggerAttackRelease(N(74), 0.2, t, 0.16);
     box.triggerAttackRelease(N(81), 0.25, t + 0.06, 0.14);
-    record(74, 0.16); record(81, 0.14);
   }
   function invalid() { if (on) tick(500, 0.12, undefined, 0.08); }
 
@@ -203,11 +199,10 @@ const Sound = (() => {
     box.triggerAttackRelease(N(h.root + 12), 0.25, t0 + vals.length * 0.07, 0.3);
     record(h.root + 12, 0.3);
   }
-  function countTick(i) {      /* score climbing: the run rises with the number */
+  function countTick(i) {      /* score climbing — live ticks only, not taped */
     if (!on) return;
     const m = PENT[i % 6] + 12 * Math.min(2, Math.floor(i / 6));
     box.triggerAttackRelease(N(m), 0.1, Tone.now(), 0.2);
-    record(m, 0.2);
   }
   function multHit() {         /* the multiplier lands on the hand's root and its fifth */
     if (!on) return; const t = Tone.now();
@@ -268,5 +263,5 @@ const Sound = (() => {
   const mute = m => { if (on) master.mute = m; };
   return { init, setBed, setLocks, pick, unpick, confirm, invalid,
            handNotes, countTick, multHit, respond, winChord, loseFall,
-           rollRattle, tick, mute };
+           rollRattle, tick, mute, commitTake, resetMemory };
 })();

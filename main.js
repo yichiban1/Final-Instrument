@@ -327,6 +327,7 @@ function countScore(from, to) {
   }, 40);
 }
 function afterPlay() {
+  try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank this hand's take into memory */
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
   dice.forEach(({ d }) => d.classList.remove('fired'));
@@ -368,6 +369,7 @@ function newGame() {
   els.stamp.innerHTML = '';
   fxClear();
   dice.forEach(({ d }) => { d.classList.remove('sel', 'fired'); });
+  try { Sound.resetMemory(); } catch (e) {}   /* new run, blank tape */
   renderMeta(); renderPreview();
   nextHand();
 }
