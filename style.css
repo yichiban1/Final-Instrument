@@ -139,6 +139,42 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .rail-meta .meta:nth-child(1) .mval { color: var(--ink); }
 .rail-meta .meta:nth-child(2) .mval { color: var(--red); }   /* shakes are spent — the red chips */
 .rail-meta .meta:nth-child(3) .mval { color: var(--gold); }
+/* ---------- tape: the loop memory, made visible ---------- */
+/* three take-windows and a playhead, printed into the rail like a deck's tape counter */
+.rail-tape .rail-cap { margin-bottom: 10px; }
+.tape-track { display: flex; flex-direction: column; gap: 8px; }
+.tape-slots { display: flex; gap: 8px; }
+.tslot {
+  position: relative; width: 34px; height: 16px; border-radius: 3px;
+  border: 1px dashed color-mix(in srgb, var(--edge) 70%, transparent);
+  background: rgba(0, 0, 0, .18);
+  transition: border-color .3s, background .3s, box-shadow .3s;
+}
+.tslot::before {  /* the reel window — lit when the slot holds a take */
+  content: ""; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px;
+  border-radius: 50%; transform: translate(-50%, -50%);
+  background: var(--ink-dim); opacity: 0; transition: opacity .3s;
+}
+.tslot.on { border-style: solid; }
+.tslot.on::before { opacity: 1; }
+.tslot.on.t1 { border-color: var(--gold); background: rgba(205, 187, 114, .1); box-shadow: 0 0 8px rgba(205, 187, 114, .2); }
+.tslot.on.t1::before { background: var(--gold); box-shadow: 0 0 5px rgba(205, 187, 114, .6); }
+.tslot.on.t2 { border-color: color-mix(in srgb, var(--gold) 55%, transparent); background: rgba(205, 187, 114, .05); }
+.tslot.on.t2::before { background: var(--gold); opacity: .55; }
+.tslot.on.t3 { border-color: color-mix(in srgb, var(--gold) 30%, transparent); }
+.tslot.on.t3::before { background: var(--gold); opacity: .3; }
+/* the playhead: one slow sweep per loop, silent until memory exists */
+.tape-line {
+  position: relative; height: 2px; overflow: hidden;
+  background: color-mix(in srgb, var(--edge) 45%, transparent);
+}
+.playhead {
+  position: absolute; left: 0; top: -1px; width: 2px; height: 4px;
+  background: var(--red); opacity: 0;
+}
+.rail-tape.live .playhead { opacity: .9; animation: tapeSweep 4.5s linear infinite; }
+@keyframes tapeSweep { from { left: 0; } to { left: 100%; } }
+
 /* the variant tag — this build's one-line manifesto */
 .variant-tag {
   position: fixed; left: 26px; bottom: 10px; z-index: 1;
@@ -467,5 +503,6 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   body::after, .playbtn:not(:disabled),
   .pname.pop, .crow.pulse, .playbtn.armed, .stage.impact,
   .pmath.punch, .rail-score .big.bump, .progress .fill.flash { animation: none; }
+  .rail-tape.live .playhead { animation: none; opacity: .45; }   /* static marker, no sweep */
   .die, .shadow, .playbtn, .ghost, .crow, .meta .mval::before { transition-duration: .01s; }
 }

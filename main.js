@@ -10,6 +10,7 @@ const els = {
   msg: $('msg'), score: $('scoreEl'), target: $('targetEl'),
   hands: $('handsEl'), rerolls: $('rerollsEl'), round: $('roundEl'),
   pName: $('pName'), pMath: $('pMath'), playBtn: $('playBtn'), prog: $('progFill'),
+  tape: $('tape'),
   comboList: $('comboList'), end: $('end'), endName: $('endName'),
   endStats: $('endStats'), help: $('help'), endBest: $('endBest'),
 };
@@ -124,6 +125,11 @@ function fxClear() {   /* strip every one-shot feedback class */
   stageEl.classList.remove('fx-low', 'fx-med', 'fx-high', 'impact');
   document.querySelectorAll('.pop, .pulse, .armed, .bump, .flash, .punch').forEach(el =>
     el.classList.remove('pop', 'pulse', 'armed', 'bump', 'flash', 'punch'));
+}
+const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
+function renderTape(n) {   /* n = committed takes in memory; slot 1 is the newest */
+  tapeSlots.forEach((s, i) => s.className = 'tslot' + (i < n ? ' on t' + (i + 1) : ''));
+  els.tape.classList.toggle('live', n > 0);
 }
 function stamp(text, cls = '') {
   const s = document.createElement('div');
@@ -327,7 +333,7 @@ function countScore(from, to) {
   }, 40);
 }
 function afterPlay() {
-  try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank this hand's take into memory */
+  try { renderTape(Sound.commitTake()); } catch (e) {}   /* settlement done — bank the take, show memory depth */
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
   dice.forEach(({ d }) => d.classList.remove('fired'));
@@ -370,6 +376,7 @@ function newGame() {
   fxClear();
   dice.forEach(({ d }) => { d.classList.remove('sel', 'fired'); });
   try { Sound.resetMemory(); } catch (e) {}   /* new run, blank tape */
+  renderTape(0);
   renderMeta(); renderPreview();
   nextHand();
 }

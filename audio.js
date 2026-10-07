@@ -51,11 +51,13 @@ const Sound = (() => {
     currentTake.push({ at: (Tone.now() - loopStart) % LOOP_LEN, midi, vel: vel * 0.7 });
     if (currentTake.length > 24) currentTake.shift();
   }
-  function commitTake() {                          /* bank the scratch take into memory — PLAY only */
-    if (!currentTake.length) return;
-    committedTakes.unshift(currentTake);
-    if (committedTakes.length > 3) committedTakes.pop();
-    currentTake = [];
+  function commitTake() {                          /* bank the scratch take into memory — PLAY only; returns memory count */
+    if (currentTake.length) {
+      committedTakes.unshift(currentTake);
+      if (committedTakes.length > 3) committedTakes.pop();
+      currentTake = [];
+    }
+    return committedTakes.length;
   }
   function resetMemory() { currentTake = []; committedTakes = []; }
 
