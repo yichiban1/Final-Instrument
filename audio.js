@@ -60,6 +60,7 @@ const Sound = (() => {
     return committedTakes.length;
   }
   function resetMemory() { currentTake = []; committedTakes = []; }
+  const getMemoryCount = () => committedTakes.length;
 
   /* the table's harmony: straights root on their low end, everything else roots
      on the most repeated die — a pair of 4s literally re-keys the bed onto D */
@@ -265,5 +266,5 @@ const Sound = (() => {
   const mute = m => { if (on) master.mute = m; };
   return { init, setBed, setLocks, pick, unpick, confirm, invalid,
            handNotes, countTick, multHit, respond, winChord, loseFall,
-           rollRattle, tick, mute, commitTake, resetMemory };
+           rollRattle, tick, mute, commitTake, resetMemory, getMemoryCount };
 })();

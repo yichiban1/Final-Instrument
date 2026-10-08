@@ -127,9 +127,12 @@ function fxClear() {   /* strip every one-shot feedback class */
     el.classList.remove('pop', 'pulse', 'armed', 'bump', 'flash', 'punch'));
 }
 const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
-function renderTape(n) {   /* n = committed takes in memory; slot 1 is the newest */
+function renderTape() {   /* Read committed memory only; position 01 is newest. */
+  let n;
+  try { n = Sound.getMemoryCount(); } catch (e) { return; }
   tapeSlots.forEach((s, i) => s.className = 'tslot' + (i < n ? ' on t' + (i + 1) : ''));
   els.tape.classList.toggle('live', n > 0);
+  els.tape.setAttribute('aria-label', 'Tape memory: ' + n + ' of 3 positions filled');
 }
 function stamp(text, cls = '') {
   const s = document.createElement('div');
@@ -333,7 +336,8 @@ function countScore(from, to) {
   }, 40);
 }
 function afterPlay() {
-  try { renderTape(Sound.commitTake()); } catch (e) {}   /* settlement done — bank the take, show memory depth */
+  try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
+  renderTape();
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
   dice.forEach(({ d }) => d.classList.remove('fired'));
@@ -376,7 +380,7 @@ function newGame() {
   fxClear();
   dice.forEach(({ d }) => { d.classList.remove('sel', 'fired'); });
   try { Sound.resetMemory(); } catch (e) {}   /* new run, blank tape */
-  renderTape(0);
+  renderTape();
   renderMeta(); renderPreview();
   nextHand();
 }
