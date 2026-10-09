@@ -41,6 +41,16 @@ const Sound = (() => {
   let chord = { root: 67, tones: [67, 74] };       /* the harmony the table is lying in */
   let motif = [67, 74, 71];                        /* the figure of the current table */
   let land = 79;                                   /* root of the last hand played — where multHit lands */
+  const ECHO = {
+    low:  { delay: 0.1, gains: [0.025] },
+    med:  { delay: 0.2, gains: [0.16, 0.05] },
+    high: { delay: 0.3, gains: [0.24, 0.08, 0.025] },
+  };
+  let payoffEcho = ECHO.low;
+  function echoNote(midi, dur, time, vel) {   /* Finite live repeats; never recorded or fed back. */
+    payoffEcho.gains.forEach((gain, i) =>
+      box.triggerAttackRelease(N(midi), dur, time + payoffEcho.delay * (i + 1), vel * gain));
+  }
   /* the tape: events the player caused, replayed as the accompaniment.
      currentTake is the scratch for this hand; committedTakes holds the last
      three banked hands, newest first. setBed wipes the scratch only. */
@@ -190,16 +200,19 @@ const Sound = (() => {
    * with a thump, and afterwards the bed answers with the figure an
    * octave up: a small call-and-response between gambler and instrument.
    */
-  function handNotes(vals, key) {  /* played dice, low to high, ending on the hand's own root */
+  function handNotes(vals, key, tier = 'low') {  /* played dice, low to high, ending on the hand's own root */
     if (!on) return;
+    payoffEcho = ECHO[tier] || ECHO.low;
     const h = harmony(vals, key);
     land = h.root;
     const t0 = Tone.now() + 0.03;
     [...vals].sort((a, b) => a - b).forEach((v, i) => {
       box.triggerAttackRelease(N(PENT[v - 1]), 0.2, t0 + i * 0.07, 0.34);
+      echoNote(PENT[v - 1], 0.2, t0 + i * 0.07, 0.34);
       record(PENT[v - 1], 0.34);
     });
     box.triggerAttackRelease(N(h.root + 12), 0.25, t0 + vals.length * 0.07, 0.3);
+    echoNote(h.root + 12, 0.25, t0 + vals.length * 0.07, 0.3);
     record(h.root + 12, 0.3);
   }
   function countTick(i) {      /* score climbing — live ticks only, not taped */
@@ -211,6 +224,8 @@ const Sound = (() => {
     if (!on) return; const t = Tone.now();
     box.triggerAttackRelease(N(land + 12), 0.2, t, 0.32);
     box.triggerAttackRelease(N(Math.min(deg(land, 4) + 12, 96)), 0.35, t + 0.06, 0.3);
+    echoNote(land + 12, 0.2, t, 0.32);
+    echoNote(Math.min(deg(land, 4) + 12, 96), 0.35, t + 0.06, 0.3);
     record(land + 12, 0.32);
     record(Math.min(deg(land, 4) + 12, 96), 0.3);
     mem.triggerAttackRelease('G2', 0.06, t, 0.7);

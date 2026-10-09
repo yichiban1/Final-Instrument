@@ -301,7 +301,7 @@ function playHand(c) {
   stageEl.classList.add('fx-' + tier, 'impact');
   later(() => stageEl.classList.remove('impact'), 420);
 
-  try { Sound.handNotes(vals, c.key); } catch (e) { /* audio must never block the game */ }
+  try { Sound.handNotes(vals, c.key, tier); } catch (e) { /* audio must never block the game */ }
   stamp(t.name.toUpperCase(), t.mult >= 4 ? 'gold' : '');
   selIdx.forEach((i, k) => later(() => dice[i].d.classList.add('fired'), k * 60));   /* staggered ignition */
 
