@@ -237,6 +237,7 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .die.sel:hover { transform: translateY(-17px) rotate(-2.6deg) scale(1.07); }
 .die.sel + .shadow { transform: scaleX(1.14) translateY(3px); opacity: .3; filter: blur(6px); }
 .die.fired { animation: fire .5s ease; }
+.die.sel.non-scoring { opacity: .38; }
 @keyframes fire {
   30% { transform: translateY(-19px) rotate(-3deg) scale(1.1); }
   100% { transform: translateY(-14px) rotate(-2deg) scale(1.05); }
@@ -486,6 +487,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   55% { transform: translate(3px, -2px) rotate(.15deg); } 100% { transform: translate(0, 0) rotate(0); }
 }
 /* multiplier lands: one hard punch on the math */
+.pmath.chip-hit { animation: chipStep .16s ease-out; }
+@keyframes chipStep { 50% { transform: scale(1.08); } }
 .pmath.punch { animation: multPunch .3s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes multPunch {
   0% { transform: scale(1); } 40% { transform: scale(1.34); text-shadow: 0 0 34px rgba(205, 187, 114, .7); }
@@ -595,7 +598,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 @media (prefers-reduced-motion: reduce) {
   body::after, .playbtn:not(:disabled),
   .pname.pop, .crow.pulse, .playbtn.armed, .stage.impact,
-  .pmath.punch, .rail-score .big.bump, .progress .fill.flash { animation: none; }
+  .pmath.punch, .pmath.chip-hit, .die.fired,
+  .rail-score .big.bump, .progress .fill.flash { animation: none; }
   .rail-tape.live .playhead { animation: none; opacity: .45; }   /* static marker, no sweep */
   .die, .shadow, .playbtn, .ghost, .crow, .meta .mval::before { transition-duration: .01s; }
 }

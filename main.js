@@ -56,7 +56,10 @@ const TYPE_ORDER = ['five', 'four', 'threeStr', 'full', 'str', 'three', 'twoPair
  */
 const rnd = () => 1 + Math.random() * 6 | 0;   /* 1..6 — |0 truncates, so the +1 has to come first */
 let S = null, hold = null, timers = [], counting = false;
-const later = (fn, ms) => timers.push(setTimeout(fn, ms));   /* pending timeouts, cleared on restart */
+const later = (fn, ms) => {   /* pending timeouts, cleared on restart */
+  const id = setTimeout(() => { timers = timers.filter(t => t !== id); fn(); }, ms);
+  timers.push(id);
+};
 const dice = [];
 for (let i = 0; i < 6; i++) {
   const w = document.createElement('div'); w.className = 'die-wrap';
@@ -106,9 +109,9 @@ function renderPreview() {
     els.pMath.textContent = '';
     return;
   }
-  const chips = TYPES[c.key].base + c.sum * PIP_CHIPS;
+  const { chips, mult } = scoreBreakdown(c);
   els.pName.textContent = TYPES[c.key].name;
-  els.pMath.textContent = chips + ' × ' + TYPES[c.key].mult;
+  els.pMath.textContent = chips + ' × ' + mult;
 }
 const msg = t => els.msg.textContent = t;
 
@@ -123,8 +126,9 @@ function fxValidHand() {   /* first lock that completes a hand: name pops, row p
 }
 function fxClear() {   /* strip every one-shot feedback class */
   stageEl.classList.remove('fx-low', 'fx-med', 'fx-high', 'impact');
-  document.querySelectorAll('.pop, .pulse, .armed, .bump, .flash, .punch').forEach(el =>
-    el.classList.remove('pop', 'pulse', 'armed', 'bump', 'flash', 'punch'));
+  document.querySelectorAll('.pop, .pulse, .armed, .bump, .flash, .punch, .chip-hit').forEach(el =>
+    el.classList.remove('pop', 'pulse', 'armed', 'bump', 'flash', 'punch', 'chip-hit'));
+  dice.forEach(({ d }) => d.classList.remove('fired', 'non-scoring'));
 }
 const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
 function renderTape() {   /* Read committed memory only; position 01 is newest. */
@@ -144,40 +148,62 @@ function stamp(text, cls = '') {
 // ========================================
 // Hand Detection
 // ========================================
-/*
- * A selection always scores as the best hand it makes:
- * the checks run rarest-first, so a full house is never mistaken for its
- * pair. Straights look for consecutive unique faces inside whatever was
- * locked. Loose dice return null — they are not a hand, and the game
- * says so plainly instead of quietly paying out nothing.
- */
-function detect(vals) {
-  const n = vals.length;
-  if (!n) return null;
-  if (n === 1) return { key: 'high', sum: vals[0] };
-  const cnt = {}; vals.forEach(v => cnt[v] = (cnt[v] || 0) + 1);
-  const counts = Object.values(cnt).sort((a, b) => b - a);
-  const uniq = Object.keys(cnt).map(Number).sort((a, b) => a - b);
-  const straight = len => {
-    for (let i = 0; i + len <= uniq.length; i++) {
-      let ok = true;
-      for (let j = 1; j < len; j++) if (uniq[i + j] !== uniq[i] + j) { ok = false; break; }
-      if (ok) return true;
-    }
-    return false;
+/* Strongest hand first; equal patterns prefer more pips, then earlier dice. */
+function detect(vals, indices = vals.map((_, i) => i)) {
+  if (!vals.length) return null;
+  const groups = new Map();
+  vals.forEach((value, i) => {
+    if (!groups.has(value)) groups.set(value, []);
+    groups.get(value).push({ value, index: indices[i] });
+  });
+  const faces = [...groups.keys()].sort((a, b) => b - a);
+  const result = (key, members) => {
+    const ordered = [...members].sort((a, b) => a.index - b.index);
+    return { key, scoringIndices: ordered.map(d => d.index),
+             scoringValues: ordered.map(d => d.value), sum: ordered.reduce((sum, d) => sum + d.value, 0) };
   };
-  if (counts[0] === 5) return { key: 'five', sum: vals.reduce((a, b) => a + b) };
-  if (counts[0] === 4) return { key: 'four', sum: vals.reduce((a, b) => a + b) };
-  if (counts[0] === 3 && counts[1] >= 2) return { key: 'full', sum: vals.reduce((a, b) => a + b) };
-  if (n >= 5 && straight(5)) return { key: 'threeStr', sum: vals.reduce((a, b) => a + b) };
-  if (n >= 4 && straight(4)) return { key: 'str', sum: vals.reduce((a, b) => a + b) };
-  if (counts[0] === 3) return { key: 'three', sum: vals.reduce((a, b) => a + b) };
-  if (counts[0] === 2 && counts[1] === 2) return { key: 'twoPair', sum: vals.reduce((a, b) => a + b) };
-  if (counts[0] === 2) return { key: 'pair', sum: vals.reduce((a, b) => a + b) };
-  return null;   /* loose dice — not a hand */
+  const matching = len => faces.find(v => groups.get(v).length >= len);
+  const straight = len => {
+    for (const high of faces) {
+      const run = Array.from({ length: len }, (_, i) => high - len + 1 + i);
+      if (run.every(v => groups.has(v))) return run.map(v => groups.get(v)[0]);
+    }
+    return null;
+  };
+  const five = matching(5), four = matching(4), three = matching(3);
+  if (five !== undefined) return result('five', groups.get(five).slice(0, 5));
+  if (four !== undefined) return result('four', groups.get(four).slice(0, 4));
+  let full = null, fullSum = -1;
+  faces.filter(v => groups.get(v).length >= 3).forEach(triple => {
+    faces.filter(v => v !== triple && groups.get(v).length >= 2).forEach(pair => {
+      const sum = triple * 3 + pair * 2;
+      if (sum > fullSum) {
+        fullSum = sum;
+        full = [...groups.get(triple).slice(0, 3), ...groups.get(pair).slice(0, 2)];
+      }
+    });
+  });
+  if (full) return result('full', full);
+  const bigRun = straight(5), smallRun = straight(4);
+  if (bigRun) return result('threeStr', bigRun);
+  if (smallRun) return result('str', smallRun);
+  if (three !== undefined) return result('three', groups.get(three).slice(0, 3));
+  const pairs = faces.filter(v => groups.get(v).length >= 2);
+  if (pairs.length >= 2) return result('twoPair', pairs.slice(0, 2).flatMap(v => groups.get(v).slice(0, 2)));
+  if (pairs.length) return result('pair', groups.get(pairs[0]).slice(0, 2));
+  return result('high', groups.get(faces[0]).slice(0, 1));
 }
 const selected = () => dice.map((_, i) => S.d[i]).filter(v => v !== null);
-function currentCombo() { return detect(selected()); }
+function currentCombo() {
+  const indices = S.d.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
+  return detect(indices.map(i => S.d[i]), indices);
+}
+function scoreBreakdown(c) {
+  const { base, mult } = TYPES[c.key];
+  const contributions = c.scoringIndices.map((index, i) => ({ index, chips: c.scoringValues[i] * PIP_CHIPS }));
+  const chips = base + contributions.reduce((sum, d) => sum + d.chips, 0);
+  return { base, mult, contributions, chips, gain: chips * mult };
+}
 
 // ========================================
 // Selection Is Performance
@@ -272,17 +298,11 @@ function releaseShake() {
 // ========================================
 // The Payout, Staged
 // ========================================
-/*
- * A hand reveals in two acts: first the chips count up note by note,
- * then the multiplier lands and the score climbs. The staging matters —
- * the number is only half the fun, the other half is watching it arrive.
- * The run's best hand is kept aside for the end card, because a
- * gambler's story is told in their biggest pot.
- */
+/* Base chips → scoring dice → multiplier → score. All stages cancel on restart. */
 els.playBtn.addEventListener('click', () => {
   if (!S || S.rolling || counting || S.phase !== 'PLAY') return;
   const c = currentCombo();
-  if (!c) { Sound.invalid(); msg('loose dice don\u2019t make a hand — pair them up or shake'); return; }
+  if (!c) { Sound.invalid(); msg('select a die to play'); return; }
   playHand(c);
 });
 
@@ -290,57 +310,57 @@ function playHand(c) {
   counting = true;
   els.playBtn.disabled = true;   /* no re-triggers while the score counts up */
   const t = TYPES[c.key];
-  const vals = selected();
-  const chips = t.base + c.sum * PIP_CHIPS;
-  const gain = chips * t.mult;
+  const { base, mult, contributions, gain } = scoreBreakdown(c);
   if (!S.best || gain > S.best.gain) S.best = { name: t.name, gain };
-  const selIdx = [];
-  S.d.forEach((v, i) => { if (v !== null) selIdx.push(i); });
+  dice.forEach(({ d }, i) => d.classList.toggle('non-scoring', S.d[i] !== null && !c.scoringIndices.includes(i)));
+  els.pName.textContent = t.name;
+  els.pMath.textContent = base + ' × ' + mult;
 
   const tier = t.mult >= 6 ? 'high' : t.mult >= 3 ? 'med' : 'low';   /* visual intensity tier from the multiplier */
   stageEl.classList.add('fx-' + tier, 'impact');
   later(() => stageEl.classList.remove('impact'), 420);
 
-  try { Sound.handNotes(vals, c.key, tier); } catch (e) { /* audio must never block the game */ }
+  try { Sound.handNotes(c.scoringValues, c.key, tier); } catch (e) { /* audio must never block the game */ }
   stamp(t.name.toUpperCase(), t.mult >= 4 ? 'gold' : '');
-  selIdx.forEach((i, k) => later(() => dice[i].d.classList.add('fired'), k * 60));   /* staggered ignition */
 
-  /* act one: the chips count up */
-  let shown = 0;
-  const chipIv = setInterval(() => {
-    shown = Math.min(chips, shown + Math.max(1, Math.ceil(chips / 18)));
-    els.pMath.textContent = shown + ' × ' + t.mult;
-    try { Sound.countTick(Math.floor(shown / Math.max(1, chips) * 11)); } catch (e) {}
-    if (shown >= chips) {
-      clearInterval(chipIv);
-      try { Sound.multHit(); } catch (e) {}
-      els.pMath.classList.add('punch');
-      later(() => els.pMath.classList.remove('punch'), 300);
-      countScore(S.score, S.score + gain);
-    }
-  }, 45);
+  let shown = base;
+  contributions.forEach(({ index, chips }, k) => later(() => {
+    dice[index].d.classList.add('fired');
+    shown += chips;
+    els.pMath.textContent = shown + ' × ' + mult;
+    els.pMath.classList.remove('chip-hit'); void els.pMath.offsetWidth; els.pMath.classList.add('chip-hit');
+    later(() => els.pMath.classList.remove('chip-hit'), 160);
+    try { Sound.countTick(k); } catch (e) {}
+  }, 180 + k * 180));
+  later(() => {
+    try { Sound.multHit(); } catch (e) {}
+    els.pMath.classList.add('punch');
+    later(() => els.pMath.classList.remove('punch'), 300);
+    countScore(S.score, S.score + gain);
+  }, 180 + contributions.length * 180 + 120);
 }
 function countScore(from, to) {
   let v = from;
-  const iv = setInterval(() => {
+  const step = () => {
     v = Math.min(to, v + Math.max(1, Math.ceil((to - from) / 22)));
     S.score = v; els.score.textContent = v; updateProgress();
     if (v >= to) {
-      clearInterval(iv);
       els.score.classList.add('bump');
       els.prog.classList.add('flash');
       later(() => { els.score.classList.remove('bump'); els.prog.classList.remove('flash'); }, 400);
       counting = false;
       afterPlay();
-    }
-  }, 40);
+    } else later(step, 40);
+  };
+  later(step, 40);
 }
 function afterPlay() {
   try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
   renderTape();
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
-  dice.forEach(({ d }) => d.classList.remove('fired'));
+  dice.forEach(({ d }) => d.classList.remove('fired', 'non-scoring'));
+  els.pMath.classList.remove('chip-hit', 'punch');
   els.pName.textContent = '—'; els.pMath.textContent = '';
   document.querySelectorAll('.crow').forEach(r => r.classList.remove('on'));
   stageEl.classList.remove('fx-low', 'fx-med', 'fx-high');
@@ -371,6 +391,8 @@ function nextHand() {
  */
 function newGame() {
   timers.forEach(clearTimeout); timers = [];
+  counting = false;
+  if (hold) { clearInterval(hold.iv); hold = null; }
   S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, hands: HANDS,
         shakes: SHAKES, d: [null, null, null, null, null, null],
         vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null };
@@ -378,7 +400,10 @@ function newGame() {
   els.endBest.textContent = '';
   els.stamp.innerHTML = '';
   fxClear();
-  dice.forEach(({ d }) => { d.classList.remove('sel', 'fired'); });
+  dice.forEach(({ d, w }) => {
+    d.classList.remove('sel', 'fired', 'non-scoring', 'settle');
+    w.className = 'die-wrap'; w.style.animationDelay = '';
+  });
   try { Sound.resetMemory(); } catch (e) {}   /* new run, blank tape */
   renderTape();
   renderMeta(); renderPreview();
