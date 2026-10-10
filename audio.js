@@ -56,20 +56,42 @@ const Sound = (() => {
      three banked hands, newest first. setBed wipes the scratch only. */
   const LOOP_LEN = 4.5;                            /* seconds of tape — short enough to feel alive */
   let currentTake = [], committedTakes = [], loopStart = 0;
-  const TAKE_GAIN = [1, 0.55, 0.3];                /* newest take clearest, older ones recede */
+  const LAYERS = [
+    { role: 'lead', transpose: 0, duration: 0.3, gain: 0.72, every: 1 },
+    { role: 'harmony', transpose: -12, duration: 0.48, gain: 0.43, every: 1 },
+    { role: 'bed', transpose: -24, duration: 0.72, gain: 0.24, every: 2 },
+  ];
+  function replayPitch(midi) {
+    const bounded = Math.max(43, Math.min(95, midi));
+    return bounded - [0, 1, 2].find(offset => PENT.some(note => note % 12 === (bounded - offset) % 12));
+  }
+  const tapeListeners = new Set();
+  const getTapeState = () => ({
+    liveEvents: currentTake.length,
+    layers: LAYERS.map((layer, i) => {
+      const events = committedTakes[i]?.length || 0;
+      return { role: layer.role, events, playbackEvents: Math.ceil(events / layer.every) };
+    }),
+  });
+  function tapeChanged() {
+    tapeListeners.forEach(fn => { try { fn(); } catch (e) {} });
+  }
+  const onTapeChange = fn => { tapeListeners.add(fn); return () => tapeListeners.delete(fn); };
   function record(midi, vel) {                     /* commit a sound to the scratch take, at its own timing */
     currentTake.push({ at: (Tone.now() - loopStart) % LOOP_LEN, midi, vel: vel * 0.7 });
     if (currentTake.length > 24) currentTake.shift();
+    tapeChanged();
   }
   function commitTake() {                          /* bank the scratch take into memory — PLAY only; returns memory count */
     if (currentTake.length) {
       committedTakes.unshift(currentTake);
       if (committedTakes.length > 3) committedTakes.pop();
       currentTake = [];
+      tapeChanged();
     }
     return committedTakes.length;
   }
-  function resetMemory() { currentTake = []; committedTakes = []; }
+  function resetMemory() { currentTake = []; committedTakes = []; tapeChanged(); }
   const getMemoryCount = () => committedTakes.length;
 
   /* the table's harmony: straights root on their low end, everything else roots
@@ -131,14 +153,19 @@ const Sound = (() => {
     // ========================================
     /*
      * One loop of the player's own making, spinning under the live
-     * action. Committed hands keep playing underneath — newest clearest,
-     * older ones fading back — while the current hand's scratch take
-     * spins on top until it is banked or wiped by the next roll.
+     * action. Age assigns a playback role; stored events stay untouched.
+     * The scratch take stays foreground until it is banked or wiped.
      */
     new Tone.Loop(t => {
       loopStart = t;
-      committedTakes.forEach((tk, i) =>
-        tk.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel * TAKE_GAIN[i])));
+      committedTakes.forEach((tk, i) => {
+        const layer = LAYERS[i];
+        tk.forEach((e, j) => {
+          if (j % layer.every) return;
+          const midi = replayPitch(e.midi + layer.transpose);
+          box.triggerAttackRelease(N(midi), layer.duration, t + e.at, e.vel * layer.gain);
+        });
+      });
       currentTake.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel));
     }, LOOP_LEN).start(0);
     Tone.Transport.start();
@@ -155,6 +182,7 @@ const Sound = (() => {
     chord = harmony(vals, key);
     motif = boardMotif();
     currentTake = [];              /* committed memory survives the roll */
+    tapeChanged();
     if (!on) return;
     const t = Tone.now() + 0.02;
     /* bed is heard live, not remembered — no record() here */
@@ -281,5 +309,6 @@ const Sound = (() => {
   const mute = m => { if (on) master.mute = m; };
   return { init, setBed, setLocks, pick, unpick, confirm, invalid,
            handNotes, countTick, multHit, respond, winChord, loseFall,
-           rollRattle, tick, mute, commitTake, resetMemory, getMemoryCount };
+           rollRattle, tick, mute, commitTake, resetMemory, getMemoryCount,
+           getTapeState, onTapeChange };
 })();

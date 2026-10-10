@@ -32,13 +32,16 @@
         <div class="meta"><span class="cap">shakes</span><span class="mval" id="rerollsEl">3</span></div>
         <div class="meta"><span class="cap">round</span><span class="mval" id="roundEl">1/3</span></div>
       </div>
-      <div class="rail-tape" id="tape" role="group" aria-label="Tape memory: 0 of 3 positions filled">
+      <div class="rail-tape" id="tape" role="group" aria-label="Tape: live empty; lead, harmony and bed empty">
         <div class="cap rail-cap">tape</div>
         <div class="tape-track">
-          <div class="tape-slots" id="tapeSlots" aria-hidden="true" title="01 newest · 03 oldest">
-            <span class="tslot"><span class="tape-position">01</span></span>
-            <span class="tslot"><span class="tape-position">02</span></span>
-            <span class="tslot"><span class="tape-position">03</span></span>
+          <div class="tslot tape-live" id="tapeLive" aria-hidden="true">
+            <span class="tape-role">live</span><span class="tape-position">now</span><span class="tape-segments"></span>
+          </div>
+          <div class="tape-slots" id="tapeSlots" aria-hidden="true" title="01 newest · 03 oldest · roles follow age">
+            <span class="tslot t1"><span class="tape-role">lead</span><span class="tape-position">01</span><span class="tape-segments"></span></span>
+            <span class="tslot t2"><span class="tape-role">harm</span><span class="tape-position">02</span><span class="tape-segments"></span></span>
+            <span class="tslot t3"><span class="tape-role">bed</span><span class="tape-position">03</span><span class="tape-segments"></span></span>
           </div>
           <div class="tape-line" aria-hidden="true"><span class="playhead"></span></div>
         </div>
@@ -87,7 +90,7 @@
     <div class="help-row"><span class="help-key">every roll</span><span>re-keys the bed to the hand lying on the table — a pair is a bare fifth, a full house a thick stack. rarer hand, bigger chord.</span></div>
     <div class="help-row"><span class="help-key">your locks</span><span>two or more locked dice rewrite the box&rsquo;s tune.</span></div>
     <div class="help-row"><span class="help-key">banking</span><span>the score run ends on your hand&rsquo;s own root note, and the box answers it an octave up.</span></div>
-    <div class="help-row"><span class="help-key">the tape</span><span>your last three played hands stay on the tape and accompany later hands.</span></div>
+    <div class="help-row"><span class="help-key">the tape</span><span>your last three played hands stay: each leads, then settles into harmony and bed as new hands arrive.</span></div>
     <div class="help-btns"><button class="ghost" id="helpClose">close</button></div>
   </div>
 </div>

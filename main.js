@@ -93,7 +93,7 @@ function renderMeta() {
   els.hands.textContent = S.hands;
   els.rerolls.textContent = S.shakes;
   els.round.textContent = (S.round + 1) + '/' + ROUNDS.length;
-  els.playBtn.disabled = !currentCombo();
+  els.playBtn.disabled = S.rolling || counting || S.phase !== 'PLAY' || !currentCombo();
   updateProgress();
 }
 function updateProgress() {
@@ -131,13 +131,30 @@ function fxClear() {   /* strip every one-shot feedback class */
   dice.forEach(({ d }) => d.classList.remove('fired', 'non-scoring'));
 }
 const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
-function renderTape() {   /* Read committed memory only; position 01 is newest. */
-  let n;
-  try { n = Sound.getMemoryCount(); } catch (e) { return; }
-  tapeSlots.forEach((s, i) => s.className = 'tslot' + (i < n ? ' on t' + (i + 1) : ''));
-  els.tape.classList.toggle('live', n > 0);
-  els.tape.setAttribute('aria-label', 'Tape memory: ' + n + ' of 3 positions filled');
+const tapeLive = $('tapeLive');
+[tapeLive, ...tapeSlots].forEach(row => {
+  const line = row.querySelector('.tape-segments');
+  for (let i = 0; i < 8; i++) line.appendChild(document.createElement('span'));
+});
+function renderTape() {   /* Only counts cross the audio / UI boundary. */
+  let state;
+  try { state = Sound.getTapeState(); } catch (e) { return; }
+  const paint = (row, events, playbackEvents) => {
+    row.classList.toggle('on', events > 0);
+    const filled = Math.ceil(playbackEvents / 24 * 8);
+    row.querySelectorAll('.tape-segments span').forEach((segment, i) => segment.classList.toggle('filled', i < filled));
+  };
+  paint(tapeLive, state.liveEvents, state.liveEvents);
+  tapeLive.title = 'Live scratch: ' + state.liveEvents + ' events';
+  state.layers.forEach((layer, i) => {
+    paint(tapeSlots[i], layer.events, layer.playbackEvents);
+    tapeSlots[i].title = layer.role + ': ' + layer.events + ' stored, ' + layer.playbackEvents + ' replayed per loop';
+  });
+  els.tape.classList.toggle('live', state.liveEvents > 0 || state.layers.some(layer => layer.events > 0));
+  els.tape.setAttribute('aria-label', 'Tape: live ' + state.liveEvents + ' events; ' +
+    state.layers.map(layer => layer.role + ' ' + layer.playbackEvents + ' events per loop').join('; '));
 }
+try { Sound.onTapeChange(renderTape); } catch (e) {}
 function stamp(text, cls = '') {
   const s = document.createElement('div');
   s.className = 'stamp ' + cls; s.textContent = text;
@@ -359,6 +376,7 @@ function afterPlay() {
   renderTape();
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
+  els.playBtn.disabled = true;   /* settlement / round transition is not playable */
   dice.forEach(({ d }) => d.classList.remove('fired', 'non-scoring'));
   els.pMath.classList.remove('chip-hit', 'punch');
   els.pName.textContent = '—'; els.pMath.textContent = '';

@@ -144,28 +144,30 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .rail-meta .meta:nth-child(2) .mval { color: var(--red); }   /* shakes are spent — the red chips */
 .rail-meta .meta:nth-child(3) .mval { color: var(--gold); }
 /* ---------- tape: the loop memory, made visible ---------- */
-/* Fixed memory positions, newest first. */
+/* Age assigns the role; segments show approximate replay density. */
 .rail-tape .rail-cap { display: flex; margin-bottom: 8px; }
 .tape-track { display: flex; flex-direction: column; gap: 8px; }
 .tape-slots { display: grid; gap: 5px; }
 .tslot {
-  display: flex; align-items: center; gap: 10px; height: 10px;
-  color: var(--ink-dim); opacity: .3;
+  display: grid; grid-template-columns: 38px 20px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 13px;
+  color: var(--ink-dim); opacity: .4;
   transition: color .3s, opacity .3s;
 }
+.tape-role { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .tape-position { font-size: 9px; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
-.tslot::after {
-  content: ""; flex: 1; height: 6px;
-  border-top: 1px solid currentColor; border-bottom: 1px solid currentColor;
-  background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 6px);
-}
+.tape-segments { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+.tape-segments span { height: 6px; border: 1px solid currentColor; opacity: .35; }
+.tape-segments .filled { background: currentColor; opacity: 1; }
+.tape-live { border-bottom: 1px dotted var(--edge); padding-bottom: 6px; }
+.tape-live .tape-position { font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .tslot.on { color: var(--gold); }
-.tslot.on.t1 { opacity: 1; }
+.tslot.on.t1 { opacity: .9; }
 .tslot.on.t2 { opacity: .65; }
 .tslot.on.t3 { opacity: .4; }
+.tape-live.on { color: var(--ink); opacity: 1; }
 /* the playhead: one slow sweep per loop, silent until memory exists */
 .tape-line {
-  position: relative; height: 4px; overflow: hidden; margin-left: 25px;
+  position: relative; height: 4px; overflow: hidden; margin-left: 70px;
   background: color-mix(in srgb, var(--edge) 45%, transparent);
 }
 .playhead {
@@ -545,6 +547,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .rail-tape { grid-column: 1 / -1; }
   .rail-tape .rail-cap { margin-bottom: 6px; }
   .tape-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .tape-slots .tslot { grid-template-columns: 1fr auto; gap: 4px; }
+  .tape-slots .tape-segments { grid-column: 1 / -1; }
   .tape-line { margin-left: 0; }
   .stage { min-height: 360px; padding: 52px 8px 22px; touch-action: none; }
   .stage::before { top: 38%; width: 92%; height: 62%; }
