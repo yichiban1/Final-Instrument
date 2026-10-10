@@ -154,6 +154,7 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   transition: color .3s, opacity .3s;
 }
 .tape-role { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.tape-depth { font-size: 8px; letter-spacing: .12em; opacity: .65; }
 .tape-position { font-size: 9px; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
 .tape-segments { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
 .tape-segments span { height: 6px; border: 1px solid currentColor; opacity: .35; }
@@ -164,6 +165,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .tslot.on.t1 { opacity: .9; }
 .tslot.on.t2 { opacity: .65; }
 .tslot.on.t3 { opacity: .4; }
+.tslot.on.t2 .filled { box-shadow: 0 0 2px currentColor; }
+.tslot.on.t3 .filled { opacity: .75; box-shadow: 0 0 4px currentColor; }
 .tape-live.on { color: var(--ink); opacity: 1; }
 /* the playhead: one slow sweep per loop, silent until memory exists */
 .tape-line {

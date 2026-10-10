@@ -5,7 +5,7 @@
  * keeps only deliberate gestures — picks, the banked hand, the mult landing.
  */
 const Sound = (() => {
-  let on = false, box, master, rev, mem, hatGain, bp;
+  let on = false, starting = null, box, master, rev, mem, hatGain, bp, tapeBuses = [];
 
   // ========================================
   // Scale & Chord Mapping
@@ -57,9 +57,9 @@ const Sound = (() => {
   const LOOP_LEN = 4.5;                            /* seconds of tape — short enough to feel alive */
   let currentTake = [], committedTakes = [], loopStart = 0;
   const LAYERS = [
-    { role: 'lead', transpose: 0, duration: 0.3, gain: 0.72, every: 1 },
-    { role: 'harmony', transpose: -12, duration: 0.48, gain: 0.43, every: 1 },
-    { role: 'bed', transpose: -24, duration: 0.72, gain: 0.24, every: 2 },
+    { role: 'lead', transpose: 0, duration: 0.3, gain: 0.72, every: 1, wet: 0.08, decay: 0.8, output: 0.9 },
+    { role: 'harmony', transpose: -12, duration: 0.48, gain: 0.43, every: 1, wet: 0.32, decay: 1.5, output: 0.8 },
+    { role: 'bed', transpose: -24, duration: 0.72, gain: 0.24, every: 2, wet: 0.56, decay: 2.4, output: 0.65 },
   ];
   function replayPitch(midi) {
     const bounded = Math.max(43, Math.min(95, midi));
@@ -91,7 +91,11 @@ const Sound = (() => {
     }
     return committedTakes.length;
   }
-  function resetMemory() { currentTake = []; committedTakes = []; tapeChanged(); }
+  function resetMemory() {
+    currentTake = []; committedTakes = [];
+    if (on) rebuildPlayback();   /* Dispose queued notes and room tails from the old run. */
+    tapeChanged();
+  }
   const getMemoryCount = () => committedTakes.length;
 
   /* the table's harmony: straights root on their low end, everything else roots
@@ -123,24 +127,41 @@ const Sound = (() => {
   // One Instrument
   // ========================================
   /*
-   * Everything is played on a single music box: soft sine plucks through
-   * a short reverb. Bass, chords, melody and punctuation are just
+   * Everything shares one music-box timbre: soft sine plucks through
+   * separate rooms for live notes and tape. Bass, chords, melody and punctuation are just
    * registers of that one voice. One timbre keeps the whole game sounding
    * like a single object speaking, rather than an orchestra of unrelated
    * sound effects competing for attention.
    */
   async function init() {
     if (on) return;
-    await Tone.start();
-    master = new Tone.Volume(-4).toDestination();
-    rev = new Tone.Reverb({ decay: 1.3, wet: 0.1 }).connect(master);
-    try { rev.generate(); } catch (e) { /* reverb fills in when ready */ }
-    /* the one instrument: kalimba-ish sine plucks */
-    box = new Tone.PolySynth(Tone.Synth, {
+    if (starting) return starting;
+    starting = startAudio();
+    try { await starting; } finally { starting = null; }
+  }
+  function musicBox(output) {
+    const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sine' },
       envelope: { attack: 0.002, decay: 0.45, sustain: 0, release: 0.35 },
-    }).connect(rev);
-    box.volume.value = -8;
+    }).connect(output);
+    synth.volume.value = -8;
+    return synth;
+  }
+  function rebuildPlayback() {
+    box?.dispose(); rev?.dispose();
+    tapeBuses.forEach(bus => { bus.synth.dispose(); bus.room.dispose(); bus.output.dispose(); });
+    rev = new Tone.Reverb({ decay: 1.3, wet: 0.1 }).connect(master);
+    box = musicBox(rev);
+    tapeBuses = LAYERS.map(layer => {
+      const output = new Tone.Gain(layer.output).connect(master);
+      const room = new Tone.Reverb({ decay: layer.decay, wet: layer.wet }).connect(output);
+      return { synth: musicBox(room), room, output };
+    });
+  }
+  async function startAudio() {
+    await Tone.start();
+    master = new Tone.Volume(-4).toDestination();
+    rebuildPlayback();   /* Same voice, separate rooms; tape never feeds the live reverb. */
     mem = new Tone.MembraneSynth({ envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(master);
     mem.volume.value = -10;
     /* shared noise channel for rattle / tick effects */
@@ -163,7 +184,7 @@ const Sound = (() => {
         tk.forEach((e, j) => {
           if (j % layer.every) return;
           const midi = replayPitch(e.midi + layer.transpose);
-          box.triggerAttackRelease(N(midi), layer.duration, t + e.at, e.vel * layer.gain);
+          tapeBuses[i].synth.triggerAttackRelease(N(midi), layer.duration, t + e.at, e.vel * layer.gain);
         });
       });
       currentTake.forEach(e => box.triggerAttackRelease(N(e.midi), 0.3, t + e.at, e.vel));
