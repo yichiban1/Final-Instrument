@@ -6,6 +6,7 @@
  */
 const Sound = (() => {
   let on = false, starting = null, box, master, rev, mem, hatGain, bp, tapeBuses = [];
+  let tapeFilter, tapeGate, tapeLFO, shakeTier = 0;
 
   // ========================================
   // Scale & Chord Mapping
@@ -55,6 +56,12 @@ const Sound = (() => {
      currentTake is the scratch for this hand; committedTakes holds the last
      three banked hands, newest first. setBed wipes the scratch only. */
   const LOOP_LEN = 4.5;                            /* seconds of tape — short enough to feel alive */
+  const MUTATION = [
+    { cutoff: 20000, depth: 0, rate: 6 / LOOP_LEN },
+    { cutoff: 5200, depth: 0.12, rate: 6 / LOOP_LEN },  /* WOBBLE */
+    { cutoff: 1800, depth: 0.75, rate: 24 / LOOP_LEN }, /* CHOP */
+    { cutoff: 950, depth: 0.94, rate: 36 / LOOP_LEN },  /* BREAK */
+  ];
   let currentTake = [], committedTakes = [], loopStart = 0;
   const LAYERS = [
     { role: 'lead', transpose: 0, duration: 0.3, gain: 0.72, every: 1, wet: 0.08, decay: 0.8, output: 0.9 },
@@ -67,6 +74,7 @@ const Sound = (() => {
   }
   const tapeListeners = new Set();
   const getTapeState = () => ({
+    shakeTier,
     liveEvents: currentTake.length,
     layers: LAYERS.map((layer, i) => {
       const events = committedTakes[i]?.length || 0;
@@ -92,6 +100,7 @@ const Sound = (() => {
     return committedTakes.length;
   }
   function resetMemory() {
+    setShakeMutation(0);
     currentTake = []; committedTakes = [];
     if (on) rebuildPlayback();   /* Dispose queued notes and room tails from the old run. */
     tapeChanged();
@@ -147,13 +156,46 @@ const Sound = (() => {
     synth.volume.value = -8;
     return synth;
   }
+  function applyShakeMutation() {
+    if (!tapeFilter) return;   /* A gesture may arrive while Tone.start() is pending. */
+    const { cutoff, depth, rate } = MUTATION[shakeTier];
+    const t = tapeGate.context.currentTime, fade = shakeTier ? 0.04 : 0.035;
+    const ramp = (param, value) => {
+      param.cancelAndHoldAtTime(t);
+      param.linearRampToValueAtTime(value, t + fade);
+    };
+    ramp(tapeFilter.frequency, Math.min(cutoff, tapeFilter.context.sampleRate * 0.45));
+    ramp(tapeLFO.frequency, rate);
+    ramp(tapeLFO.amplitude, depth);
+    /* Signed modulation + matching bias keeps gain between 1-depth and 1.
+       Both ramps share a timestamp: no boost, hard edges or accumulated energy. */
+    ramp(tapeGate.gain, 1 - depth / 2);
+  }
+  function setShakeMutation(tier) {
+    const next = Number.isInteger(tier) && tier >= 0 && tier <= 3 ? tier : 0;
+    if (next === shakeTier) return;
+    shakeTier = next;
+    applyShakeMutation();
+    tapeChanged();
+  }
+  function buildTapeMutation() {   /* One shared stage per audio engine, reused across resets. */
+    tapeGate = new Tone.Gain(1).connect(master);
+    /* Web Audio lowpass Q is in dB: -3.01 gives a non-resonant Butterworth response.
+       BiquadFilter exposes that signed Q directly in this bundled Tone version. */
+    tapeFilter = new Tone.BiquadFilter({ frequency: 20000, type: 'lowpass', Q: -3.01029995664 }).connect(tapeGate);
+    tapeLFO = new Tone.LFO({ frequency: 6 / LOOP_LEN, min: -0.5, max: 0.5, amplitude: 0, type: 'sine' });
+    tapeLFO.connect(tapeGate.gain);   /* Tone clears the parameter's bias on connect. */
+    tapeGate.gain.value = 1;
+    tapeLFO.start();
+    applyShakeMutation();
+  }
   function rebuildPlayback() {
     box?.dispose(); rev?.dispose();
     tapeBuses.forEach(bus => { bus.synth.dispose(); bus.room.dispose(); bus.output.dispose(); });
     rev = new Tone.Reverb({ decay: 1.3, wet: 0.1 }).connect(master);
     box = musicBox(rev);
     tapeBuses = LAYERS.map(layer => {
-      const output = new Tone.Gain(layer.output).connect(master);
+      const output = new Tone.Gain(layer.output).connect(tapeFilter);
       const room = new Tone.Reverb({ decay: layer.decay, wet: layer.wet }).connect(output);
       return { synth: musicBox(room), room, output };
     });
@@ -161,6 +203,7 @@ const Sound = (() => {
   async function startAudio() {
     await Tone.start();
     master = new Tone.Volume(-4).toDestination();
+    buildTapeMutation();
     rebuildPlayback();   /* Same voice, separate rooms; tape never feeds the live reverb. */
     mem = new Tone.MembraneSynth({ envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }).connect(master);
     mem.volume.value = -10;
@@ -331,5 +374,5 @@ const Sound = (() => {
   return { init, setBed, setLocks, pick, unpick, confirm, invalid,
            handNotes, countTick, multHit, respond, winChord, loseFall,
            rollRattle, tick, mute, commitTake, resetMemory, getMemoryCount,
-           getTapeState, onTapeChange };
+           getTapeState, onTapeChange, setShakeMutation };
 })();

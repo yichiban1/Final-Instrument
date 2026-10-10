@@ -132,11 +132,13 @@ function fxClear() {   /* strip every one-shot feedback class */
 }
 const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
 const tapeLive = $('tapeLive');
+const tapeMutation = $('tapeMutation');
+const MUTATION_NAMES = ['', 'WOBBLE', 'CHOP', 'BREAK'];
 [tapeLive, ...tapeSlots].forEach(row => {
   const line = row.querySelector('.tape-segments');
   for (let i = 0; i < 8; i++) line.appendChild(document.createElement('span'));
 });
-function renderTape() {   /* Only counts cross the audio / UI boundary. */
+function renderTape() {   /* Counts and the gesture tier cross the audio / UI boundary. */
   let state;
   try { state = Sound.getTapeState(); } catch (e) { return; }
   const paint = (row, events, playbackEvents) => {
@@ -151,8 +153,11 @@ function renderTape() {   /* Only counts cross the audio / UI boundary. */
     tapeSlots[i].title = layer.role + ': ' + layer.events + ' stored, ' + layer.playbackEvents + ' replayed per loop';
   });
   els.tape.classList.toggle('live', state.liveEvents > 0 || state.layers.some(layer => layer.events > 0));
+  els.tape.dataset.mutation = state.shakeTier;
+  tapeMutation.textContent = MUTATION_NAMES[state.shakeTier];
   els.tape.setAttribute('aria-label', 'Tape: live ' + state.liveEvents + ' events; ' +
-    state.layers.map(layer => layer.role + ' ' + layer.playbackEvents + ' events per loop').join('; '));
+    state.layers.map(layer => layer.role + ' ' + layer.playbackEvents + ' events per loop').join('; ') +
+    (state.shakeTier ? '; memory mutation ' + MUTATION_NAMES[state.shakeTier] : ''));
 }
 try { Sound.onTapeChange(renderTape); } catch (e) {}
 function stamp(text, cls = '') {
@@ -287,23 +292,46 @@ function rollDice(which, done) {
     if (done) done();
   }, 880);
 }
-function startShake() {
-  if (!S || S.rolling || counting || S.phase !== 'PLAY' || hold) return;
-  if (S.shakes <= 0) { msg('no shakes left — play what you hold'); return; }
+function resetShake() {   /* Cancel the gesture without spending a shake or rerolling. */
+  const active = hold;
+  hold = null;
+  if (active) clearInterval(active.iv);
+  dice.forEach(({ w }) => w.classList.remove('w1', 'w2', 'w3'));
+  if (active?.source === 'pointer' && els.table.hasPointerCapture(active.pointerId))
+    els.table.releasePointerCapture(active.pointerId);
+  try { Sound.setShakeMutation(0); } catch (e) {}
+  return !!active;
+}
+function startShake(source = 'keyboard', pointerId = null) {
+  if (!S || S.rolling || counting || S.phase !== 'PLAY' || hold || els.help.classList.contains('show')) return;
+  if (S.shakes <= 0) { resetShake(); msg('no shakes left — play what you hold'); return; }
   const loose = [];
   S.d.forEach((v, i) => { if (v === null) loose.push(i); });
-  if (!loose.length) { msg('everything is selected — play it'); return; }
-  hold = { t0: performance.now(), iv: setInterval(() => {
+  if (!loose.length) { resetShake(); msg('everything is selected — play it'); return; }
+  hold = { t0: performance.now(), tier: 0, source, pointerId, iv: null };
+  const update = () => {
+    if (!hold) return;
+    if (!S || S.rolling || counting || S.phase !== 'PLAY' || S.shakes <= 0 || S.d.every(v => v !== null)) {
+      resetShake(); return;
+    }
     const el = performance.now() - hold.t0;
     const tier = el < 260 ? 1 : el < 650 ? 2 : 3;
-    loose.forEach(i => dice[i].w.className = 'die-wrap w' + tier);
-    Sound.tick(1500 + Math.random() * 1400, 0.15 + tier * 0.07, undefined, 0.035);
-  }, 105) };
+    if (tier !== hold.tier) {
+      hold.tier = tier;
+      try { Sound.setShakeMutation(tier); } catch (e) {}
+    }
+    dice.forEach(({ w }, i) => {
+      w.classList.remove('w1', 'w2', 'w3');
+      if (S.d[i] === null) w.classList.add('w' + tier);
+    });
+    try { Sound.tick(1500 + Math.random() * 1400, 0.15 + tier * 0.07, undefined, 0.035); } catch (e) {}
+  };
+  update();
+  hold.iv = setInterval(update, 105);
 }
 function releaseShake() {
-  if (!hold) return;
-  clearInterval(hold.iv); hold = null;
-  dice.forEach(({ w }) => w.className = 'die-wrap');
+  if (!resetShake()) return;
+  if (!S || S.rolling || counting || S.phase !== 'PLAY' || S.shakes <= 0) return;
   const loose = [];
   S.d.forEach((v, i) => { if (v === null) loose.push(i); });
   if (!loose.length) return;
@@ -324,6 +352,7 @@ els.playBtn.addEventListener('click', () => {
 });
 
 function playHand(c) {
+  resetShake();
   counting = true;
   els.playBtn.disabled = true;   /* no re-triggers while the score counts up */
   const t = TYPES[c.key];
@@ -387,6 +416,7 @@ function afterPlay() {
   nextHand();
 }
 function nextHand() {
+  resetShake();
   S.d = [null, null, null, null, null, null];
   S.phase = 'ROLL';
   try { Sound.setLocks([]); } catch (e) {}   /* fresh hand, empty spotlight */
@@ -410,7 +440,7 @@ function nextHand() {
 function newGame() {
   timers.forEach(clearTimeout); timers = [];
   counting = false;
-  if (hold) { clearInterval(hold.iv); hold = null; }
+  resetShake();
   S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, hands: HANDS,
         shakes: SHAKES, d: [null, null, null, null, null, null],
         vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null };
@@ -428,6 +458,7 @@ function newGame() {
   nextHand();
 }
 function roundClear() {
+  resetShake();
   S.phase = 'BETWEEN';
   try { Sound.winChord(); } catch (e) {}
   if (S.round >= ROUNDS.length - 1) { gameOver(true); return; }
@@ -442,6 +473,7 @@ function roundClear() {
   }, 1600);
 }
 function gameOver(won) {
+  resetShake();
   S.phase = 'OVER';
   try { if (won) Sound.winChord(); else Sound.loseFall(); } catch (e) {}
   els.endName.textContent = won ? '\u201Cclean sweep\u201D' : '\u201Cshort stack\u201D';
@@ -461,23 +493,33 @@ function gameOver(won) {
  * browsers require — the remembered mute lands as soon as it exists.
  */
 els.table.addEventListener('pointerdown', e => {
+  if (!e.isPrimary || e.button !== 0) return;
   if (e.target.closest('.hud, .die, button, .combos, .end, a')) return;
-  startShake();
+  startShake('pointer', e.pointerId);
+  if (hold?.source === 'pointer' && hold.pointerId === e.pointerId) els.table.setPointerCapture(e.pointerId);
 });
-window.addEventListener('pointerup', releaseShake);
-window.addEventListener('pointercancel', releaseShake);
+const endPointerShake = e => {
+  if (hold?.source === 'pointer' && hold.pointerId === e.pointerId) releaseShake();
+};
+window.addEventListener('pointerup', endPointerShake);
+window.addEventListener('pointercancel', endPointerShake);
+els.table.addEventListener('lostpointercapture', e => {
+  if (hold?.source === 'pointer' && hold.pointerId === e.pointerId) resetShake();
+});
+window.addEventListener('blur', resetShake);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetShake(); });
 const KEY_DIE = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5,
                   Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5 };
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.repeat) { e.preventDefault(); startShake(); }
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !els.playBtn.disabled) els.playBtn.click();
   if (KEY_DIE[e.code] !== undefined && !e.repeat) toggleSelect(KEY_DIE[e.code]);
-  if (e.key === '?' && !e.repeat) els.help.classList.toggle('show');
+  if (e.key === '?' && !e.repeat) { resetShake(); els.help.classList.toggle('show'); }
   if (e.code === 'Escape') els.help.classList.remove('show');
 });
-window.addEventListener('keyup', e => { if (e.code === 'Space') releaseShake(); });
+window.addEventListener('keyup', e => { if (e.code === 'Space' && hold?.source === 'keyboard') releaseShake(); });
 
-$('helpBtn').addEventListener('click', () => els.help.classList.toggle('show'));
+$('helpBtn').addEventListener('click', () => { resetShake(); els.help.classList.toggle('show'); });
 $('helpClose').addEventListener('click', () => els.help.classList.remove('show'));
 
 const muteBtn = $('muteBtn');

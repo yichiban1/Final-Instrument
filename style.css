@@ -155,6 +155,20 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 }
 .tape-role { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .tape-depth { font-size: 8px; letter-spacing: .12em; opacity: .65; }
+.tape-mutation { font-size: 8px; letter-spacing: .12em; color: var(--gold); }
+.tape-mutation:empty { display: none; }
+/* The gesture marks committed memory only; the LIVE row stays immediate. */
+.rail-tape[data-mutation="1"] { --mutation-pulse: .75s; --mutation-dim: .82; }
+.rail-tape[data-mutation="2"] { --mutation-pulse: .1875s; --mutation-dim: .45; }
+.rail-tape[data-mutation="3"] { --mutation-pulse: .125s; --mutation-dim: .2; }
+.rail-tape[data-mutation="2"] .tape-mutation,
+.rail-tape[data-mutation="3"] .tape-mutation { color: var(--red); }
+.rail-tape[data-mutation="1"] .tape-slots .on .tape-segments,
+.rail-tape[data-mutation="2"] .tape-slots .on .tape-segments,
+.rail-tape[data-mutation="3"] .tape-slots .on .tape-segments {
+  animation: tapeMutation var(--mutation-pulse) ease-in-out infinite;
+}
+@keyframes tapeMutation { 50% { opacity: var(--mutation-dim); } }
 .tape-position { font-size: 9px; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
 .tape-segments { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
 .tape-segments span { height: 6px; border: 1px solid currentColor; opacity: .35; }
@@ -608,5 +622,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .pmath.punch, .pmath.chip-hit, .die.fired,
   .rail-score .big.bump, .progress .fill.flash { animation: none; }
   .rail-tape.live .playhead { animation: none; opacity: .45; }   /* static marker, no sweep */
+  .rail-tape[data-mutation] .tape-slots .on .tape-segments,
+  .die-wrap.w1 .die, .die-wrap.w2 .die, .die-wrap.w3 .die,
+  .die-wrap.w3 .shadow { animation: none; }
   .die, .shadow, .playbtn, .ghost, .crow, .meta .mval::before { transition-duration: .01s; }
 }
