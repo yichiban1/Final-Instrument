@@ -1,14 +1,5 @@
 /* Rolling — six dice, make a hand, reach the target. Night theme only. */
 
-/*
- * Visual Energy Pass — same table, louder room.
- * The structure is untouched: one left rail, dice centre stage, stamps on
- * top. What changed is the temperature. The rail is now a printed placard
- * with a house stamp, the meters are chips, the glossary is a menu with
- * dotted leaders, and the PLAY button breathes when it wants to be pressed.
- * Everything still runs on the same class hooks the game always used.
- */
-
 /* ---------- theme ---------- */
 :root {
   --felt-hi: #1d3024; --felt-lo: #0b1410;
@@ -19,6 +10,7 @@
 
 /* ---------- base ---------- */
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; overflow: hidden; }
 body {
   height: 100vh; overflow: hidden; font-family: Georgia, 'Times New Roman', serif;
   height: 100dvh;
@@ -38,7 +30,10 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   animation: lampBreathe 9s ease-in-out infinite;
 }
 @keyframes lampBreathe { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
-.table { height: 100%; display: flex; flex-direction: column; padding: 16px 26px 18px; }
+.table {
+  height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px; padding: 16px 26px 18px;
+}
 
 /* ---------- hud ---------- */
 .hud { display: flex; justify-content: space-between; align-items: baseline; }
@@ -58,50 +53,32 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .ghost:hover { color: var(--ink); border-color: var(--ink); transform: translateY(-1px); }
 .ghost.gold { color: var(--gold); border-color: var(--gold); }
 
-/*
- * Information Design — Variant 01, "One Left Rail":
- * the default build scatters the game's numbers — a scorebar up top, a
- * table of hands on the right. This variant gathers everything into a
- * single column on the left, Balatro-style: score, meters and glossary
- * stacked top to bottom, so the stage keeps the whole remaining width.
- * One rail, one glance, and the dice stay the hero of the screen.
- *
- * Energy pass: the rail is no longer a bare column with a hairline. It is
- * a framed placard laid on the felt — a double-ruled panel with a deep
- * shadow, a rotated house stamp, chip-shaped meters and a menu-style
- * glossary. A game table's info corner, not a data panel.
- */
+/* Left rail stacks round score, resources, TAPE and the hand glossary. */
 /* ---------- left rail: score, meters and glossary stacked in one column ---------- */
 .combos {
-  width: 262px; flex: none; display: flex; flex-direction: column; gap: 20px;
-  min-height: 0; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain;
-  scrollbar-width: thin; scrollbar-color: var(--edge) var(--felt-lo);
-  padding: 18px 20px 16px; border: 1px solid var(--edge); border-radius: 4px;
+  width: 310px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(5, max-content); align-self: start; align-content: start; gap: 12px;
+  /* Short desktops use 78vh; taller desktops approach 70vh, with room for descriptions. */
+  height: clamp(70dvh, calc(430px + 30dvh), 78dvh); max-height: 100%; min-height: 0;
+  padding: 18px 20px; border: 1px solid var(--edge); border-radius: 4px;
   outline: 1px solid color-mix(in srgb, var(--edge) 40%, transparent); outline-offset: 3px;
   background: linear-gradient(180deg, rgba(11, 20, 16, .58), rgba(11, 20, 16, .22));
   box-shadow: 0 18px 34px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .045);
 }
-.combos > * { flex-shrink: 0; }
+.combos > .rail-cap { margin-bottom: 0; }
 .combos .cap { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--ink-dim); }
-.rail-score { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.rail-score .cap { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--ink-dim); }
+.rail-score { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 6px 12px; min-width: 0; }
+.rail-score > .cap, .rail-score > .progress { grid-column: 1 / -1; }
+.rail-score .cap { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
 /* the score is the loudest number in the room: big, tight, tabular, with lamp-light on it */
 .rail-score .big {
-  font-size: 66px; line-height: .95; letter-spacing: -.01em;
+  font-size: 52px; line-height: .95; letter-spacing: -.01em;
   font-variant-numeric: tabular-nums;
   background: linear-gradient(180deg, var(--ink), color-mix(in srgb, var(--ink) 72%, var(--felt-lo)));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .45));
 }
 .rail-score .target { font-size: 17px; font-style: italic; color: var(--gold); letter-spacing: .04em; }
-/* the house stamp — a small rotated mark, like the placard was inked at the cage */
-.rail-score::after {
-  content: "house game · no limit"; margin-top: 4px; padding: 3px 10px;
-  font-size: 9px; letter-spacing: .28em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--red) 72%, transparent);
-  border: 1.5px double color-mix(in srgb, var(--red) 55%, transparent);
-  transform: rotate(-2.5deg);
-}
 /* target progress — a real gauge now: ticked track, striped gold fill, a hint of glow */
 .progress {
   position: relative; width: 100%; height: 8px; overflow: hidden;
@@ -121,13 +98,13 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   content: ""; position: absolute; inset: 0;
   background: repeating-linear-gradient(-45deg, rgba(0, 0, 0, .16) 0 5px, transparent 5px 10px);
 }
-.rail-meta { display: flex; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--edge); }
+.rail-meta { display: flex; justify-content: space-between; gap: 20px; padding: 4px 6px 10px; border-bottom: 1px solid var(--edge); }
 .meta { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.meta .cap { font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: var(--ink-dim); }
+.meta .cap { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
 /* hands / shakes / round are chips — round, heavy, with a milled edge that turns when touched */
 .meta .mval {
-  position: relative; display: grid; place-items: center; width: 46px; height: 46px;
-  border-radius: 50%; font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums;
+  position: relative; display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 50%; font-size: 18px; line-height: 1; font-variant-numeric: tabular-nums;
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .08), rgba(0, 0, 0, .32));
   border: 1px solid var(--edge);
   box-shadow: 0 4px 9px rgba(0, 0, 0, .38), inset 0 0 0 3px rgba(0, 0, 0, .16);
@@ -145,17 +122,21 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .rail-meta .meta:nth-child(3) .mval { color: var(--gold); }
 /* ---------- tape: the loop memory, made visible ---------- */
 /* Age assigns the role; segments show approximate replay density. */
-.rail-tape .rail-cap { display: flex; margin-bottom: 8px; }
-.tape-track { display: flex; flex-direction: column; gap: 8px; }
+.rail-tape {
+  padding: 9px 12px; border: 1px solid rgba(205, 187, 114, .24); border-radius: 3px;
+  background: linear-gradient(180deg, rgba(205, 187, 114, .035), rgba(0, 0, 0, .08));
+}
+.rail-tape .rail-cap { display: flex; margin-bottom: 6px; font-size: 13px; letter-spacing: .18em; color: var(--gold); }
+.rail-tape .rail-cap::after { display: none; }
+.tape-track { display: flex; flex-direction: column; gap: 5px; }
 .tape-slots { display: grid; gap: 5px; }
 .tslot {
-  display: grid; grid-template-columns: 38px 20px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 13px;
-  color: var(--ink-dim); opacity: .4;
-  transition: color .3s, opacity .3s;
+  display: grid; grid-template-columns: 76px 30px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 21px;
+  color: var(--ink-dim); transition: color .3s;
 }
-.tape-role { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
-.tape-depth { font-size: 8px; letter-spacing: .12em; opacity: .65; }
-.tape-mutation { font-size: 8px; letter-spacing: .12em; color: var(--gold); }
+.tape-role { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.tape-depth { margin-left: auto; font-size: 10px; letter-spacing: .05em; color: var(--ink-dim); }
+.tape-mutation { font-size: 10px; letter-spacing: .06em; color: var(--gold); }
 .tape-mutation:empty { display: none; }
 /* The gesture marks committed memory only; the LIVE row stays immediate. */
 .rail-tape[data-mutation="1"] { --mutation-pulse: .75s; --mutation-dim: .82; }
@@ -163,50 +144,44 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .rail-tape[data-mutation="3"] { --mutation-pulse: .125s; --mutation-dim: .2; }
 .rail-tape[data-mutation="2"] .tape-mutation,
 .rail-tape[data-mutation="3"] .tape-mutation { color: var(--red); }
+.rail-tape[data-mutation="2"], .rail-tape[data-mutation="3"] { border-color: var(--red); }
 .rail-tape[data-mutation="1"] .tape-slots .on .tape-segments,
 .rail-tape[data-mutation="2"] .tape-slots .on .tape-segments,
 .rail-tape[data-mutation="3"] .tape-slots .on .tape-segments {
   animation: tapeMutation var(--mutation-pulse) ease-in-out infinite;
 }
 @keyframes tapeMutation { 50% { opacity: var(--mutation-dim); } }
-.tape-position { font-size: 9px; letter-spacing: .16em; font-variant-numeric: tabular-nums; }
-.tape-segments { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
-.tape-segments span { height: 6px; border: 1px solid currentColor; opacity: .35; }
+.tape-position { font-size: 11px; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.tape-segments { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; }
+.tape-segments span { height: 11px; border: 1px solid currentColor; opacity: .45; }
 .tape-segments .filled { background: currentColor; opacity: 1; }
 .tape-live { border-bottom: 1px dotted var(--edge); padding-bottom: 6px; }
-.tape-live .tape-position { font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
+.tape-live .tape-position { text-transform: uppercase; }
 .tslot.on { color: var(--gold); }
-.tslot.on.t1 { opacity: .9; }
-.tslot.on.t2 { opacity: .65; }
-.tslot.on.t3 { opacity: .4; }
-.tslot.on.t2 .filled { box-shadow: 0 0 2px currentColor; }
-.tslot.on.t3 .filled { opacity: .75; box-shadow: 0 0 4px currentColor; }
-.tape-live.on { color: var(--ink); opacity: 1; }
+.tslot.on.t2 .filled { opacity: .8; box-shadow: 0 0 2px currentColor; }
+.tslot.on.t3 .filled { opacity: .6; box-shadow: 0 0 4px currentColor; }
+.tape-live.on { color: var(--ink); }
 /* the playhead: one slow sweep per loop, silent until memory exists */
 .tape-line {
-  position: relative; height: 4px; overflow: hidden; margin-left: 70px;
+  position: relative; height: 3px; overflow: hidden;
   background: color-mix(in srgb, var(--edge) 45%, transparent);
 }
 .playhead {
-  position: absolute; left: 0; top: 0; width: 2px; height: 4px;
+  position: absolute; left: 0; top: 0; width: 2px; height: 3px;
   background: var(--red); opacity: 0;
 }
 .rail-tape.live .playhead { opacity: .9; animation: tapeSweep 4.5s linear infinite; }
 @keyframes tapeSweep { from { left: 0; } to { left: calc(100% - 2px); } }
 
-/* the variant tag — this build's one-line manifesto */
-.variant-tag {
-  position: fixed; left: 26px; bottom: 10px; z-index: 1;
-  font-size: 9px; letter-spacing: .2em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--ink-dim) 60%, transparent);
-}
-
 /* ---------- main layout ---------- */
-.main { flex: 1; min-height: 0; display: flex; gap: 30px; margin-top: 10px; }
-.stage { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.main { min-height: 0; min-width: 0; display: flex; gap: 30px; }
+.stage {
+  position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding-top: clamp(40px, 7dvh, 76px);
+}
 /* the betting ring, printed slightly off-square like a real silk-screened layout */
 .stage::before {
-  content: ""; position: absolute; left: 50%; top: 38%; z-index: 0; pointer-events: none;
+  content: ""; position: absolute; left: 50%; top: 46%; z-index: 0; pointer-events: none;
   width: min(760px, 92%); height: min(360px, 62%);
   transform: translate(-50%, -50%) rotate(-1.4deg);
   border: 1px solid rgba(205, 187, 114, .14); border-radius: 50%;
@@ -313,7 +288,6 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   text-shadow: 0 0 18px rgba(205, 187, 114, .22);
   transition: transform .15s, text-shadow .15s;
 }
-.pmath.hot { transform: scale(1.22); text-shadow: 0 0 28px rgba(205, 187, 114, .55); }
 .repeat-line { display: flex; align-items: center; justify-content: center; min-height: 18px; max-width: 100%; }
 .repeat-notice {
   font-size: 9px; letter-spacing: .14em; padding: 2px 7px; color: var(--gold);
@@ -377,10 +351,10 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .rail-cap::before { content: "◆"; font-size: 8px; color: var(--red); }
 .rail-cap::after { content: ""; flex: 1; border-top: 1px solid color-mix(in srgb, var(--edge) 60%, transparent); }
 .crow {
-  padding: 6px 8px; border-left: 2px solid transparent;
+  padding: clamp(6px, calc(1dvh - 3px), 8px) 8px; border-left: 2px solid transparent;
   transition: border-color .2s, background .2s, color .2s, transform .2s ease;
 }
-.crow-top { display: flex; align-items: baseline; gap: 8px; }
+.crow-top { display: flex; align-items: baseline; gap: 8px; line-height: 1.2; }
 .crow-top::before {
   counter-increment: crow; content: counter(crow, decimal-leading-zero);
   font-size: 9px; letter-spacing: .16em;
@@ -395,7 +369,7 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .crow:hover { background: rgba(232, 228, 217, .04); }
 .crow:hover .cname { color: var(--ink); }
 /* the glossary whispers: a hand explains itself only when you look at it or play it */
-.crow .cdesc { display: none; margin-top: 1px; font-size: 10.5px; letter-spacing: .03em; color: color-mix(in srgb, var(--ink-dim) 75%, transparent); }
+.crow .cdesc { display: none; margin-top: 1px; font-size: 10.5px; line-height: 1.3; letter-spacing: .03em; color: color-mix(in srgb, var(--ink-dim) 75%, transparent); }
 .crow:hover .cdesc { display: block; }
 .crow.on .cdesc { display: block; color: var(--ink-dim); }
 .crow.on {
@@ -444,7 +418,7 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 .end-name { font-size: 44px; font-style: italic; letter-spacing: .04em; }
 .end-best { margin: 14px 0 0; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
 .end-best span { color: var(--gold); }
-.end-stats { margin: 12px 0 24px; font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
+.end-stats { margin: 12px 0 24px; font-size: 13px; line-height: 1.6; white-space: pre-line; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-dim); }
 .end-btns { display: flex; gap: 12px; justify-content: center; }
 
 /* ---------- help card — same language as the end card, read-side up ---------- */
@@ -530,16 +504,14 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   0% { filter: brightness(1.9); } 100% { filter: brightness(1); }
 }
 
-/* ---------- Large: 1200–1600px uses the base layout ---------- */
+/* ---------- Large: 1200–1600px uses the desktop layout ---------- */
 
 /* ---------- Expanded: 840–1199px ---------- */
 @media (840px <= width < 1200px) {
   .table { padding: 14px 20px 24px; }
   .main { gap: 22px; }
-  .combos { width: 224px; padding: 14px 14px 12px; gap: 14px; }
-  .rail-score .big { font-size: 54px; }
-  .rail-meta { justify-content: space-between; gap: 12px; padding-bottom: 14px; }
-  .meta .mval { width: 40px; height: 40px; font-size: 16px; }
+  .combos { width: 280px; padding: 14px 14px 12px; }
+  .rail-score .big { font-size: 46px; }
   .crow { padding: 5px 4px; }
   .crow-top { gap: 5px; }
   .crow .cname { font-size: 12px; gap: 4px; }
@@ -553,73 +525,27 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .stamp { font-size: 34px; }
 }
 
-/* ---------- Medium: below 840px ---------- */
-@media (width < 840px) {
-  body { overflow-y: auto; touch-action: pan-y; }
-  .table { height: auto; min-height: 100vh; min-height: 100dvh; padding: 14px 16px 28px; }
-  .main { flex-direction: column; gap: 18px; }
-  .combos {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
-    width: auto; padding: 12px 16px; gap: 12px 16px; overflow: visible;
-  }
-  .rail-score { min-width: 0; gap: 5px; }
-  .rail-score .big { font-size: clamp(30px, 5.8vw, 44px); }
-  .rail-score .target { font-size: 15px; }
-  .rail-score::after, .combos > .rail-cap, #comboList, .variant-tag { display: none; }
-  .rail-meta { gap: 16px; padding: 4px 0; border: 0; }
-  .meta .mval { width: clamp(32px, 5vw, 40px); height: clamp(32px, 5vw, 40px); font-size: 16px; }
-  .rail-tape { grid-column: 1 / -1; }
-  .rail-tape .rail-cap { margin-bottom: 6px; }
-  .tape-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .tape-slots .tslot { grid-template-columns: 1fr auto; gap: 4px; }
-  .tape-slots .tape-segments { grid-column: 1 / -1; }
-  .tape-line { margin-left: 0; }
-  .stage { min-height: 360px; padding: 52px 8px 22px; touch-action: none; }
-  .stage::before { top: 38%; width: 92%; height: 62%; }
-  .dice { max-width: 100%; gap: clamp(14px, 3vw, 24px); }
-  .die { width: clamp(54px, 9vw, 70px); height: clamp(54px, 9vw, 70px); }
-  .preview { flex-wrap: wrap; gap: 4px 12px; }
-  .preview::before, .preview::after { display: none; }
-  .pname { font-size: 25px; }
-  .pmath { font-size: 34px; }
-  .controls { flex-direction: column; gap: 12px; }
-  .controls .hint { line-height: 1.5; }
-  .stamp { top: 22%; font-size: clamp(22px, 5vw, 34px); padding: 2px 12px; }
-  .help-card, .end-card { padding: 24px; }
-  .help-row { gap: 12px; font-size: 14px; }
-  .help-key { flex-basis: 100px; }
-  .end-name { font-size: 34px; }
-}
-
-/* Medium's narrow edge: a stable 3 × 2 dice arrangement. */
-@media (width < 520px) {
-  .brand { font-size: 20px; }
-  .ghost { padding: 6px 9px; font-size: 10px; letter-spacing: .12em; }
-  .combos { padding: 12px; }
-  .stage { min-height: 460px; }
-  .dice { display: grid; grid-template-columns: repeat(3, auto); gap: 24px 22px; }
-  .help-row { flex-direction: column; gap: 3px; }
-  .help-key { flex-basis: auto; text-align: left; }
-}
-
 /* ---------- Extra-large: above 1600px ---------- */
 @media (width > 1600px) {
-  .table { max-width: 1920px; margin-inline: auto; padding: 22px 36px 28px; }
-  .main { gap: 40px; margin-top: 14px; }
-  .combos { width: 286px; padding: 22px 24px 20px; gap: 22px; }
-  .rail-score .big { font-size: 72px; }
+  .table { max-width: 1920px; margin-inline: auto; padding: 22px 36px 28px; gap: 14px; }
+  .main { gap: 40px; }
+  .combos { width: 330px; padding: 20px; gap: 14px; }
+  .rail-score .big { font-size: 56px; }
   .dice { gap: 34px; margin-bottom: 30px; }
   .die { width: 84px; height: 84px; }
   .stage::before { width: min(860px, 92%); height: min(400px, 62%); }
   .preview { width: min(620px, 94%); }
-  .variant-tag { left: max(36px, calc((100vw - 1920px) / 2 + 36px)); }
 }
 
-/* Short windows retain vertical access instead of clipping the stage. */
-@media (height < 600px) {
-  body { overflow-y: auto; touch-action: pan-y; }
-  .table { min-height: 600px; }
-  .stage { touch-action: none; }
+/* Short desktops retain the same vertical hierarchy and a modest description reserve. */
+@media (height <= 800px) {
+  .combos { padding: 12px 14px; gap: 8px; }
+  .rail-score { gap: 4px; }
+  .rail-score .big { font-size: 44px; }
+  .rail-meta { padding-block: 0 4px; }
+  .meta .mval { width: 34px; height: 34px; font-size: 16px; }
+  .rail-tape { padding: 8px 10px; }
+  .crow { padding-block: 5px; }
 }
 
 /* ---------- reduced motion: the room goes still, the game stays readable ---------- */

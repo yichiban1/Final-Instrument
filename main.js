@@ -1,8 +1,4 @@
-/**
- * Rolling — a dice poker in the spirit of Balatro.
- * Roll six dice, lock some into a poker hand, and gamble the rest:
- * every hand banks chips × mult toward a target that rises each round.
- */
+/* Rolling — six-dice poker instrument with per-round scoring and persistent tape. */
 (() => {
 const $ = id => document.getElementById(id);
 const els = {
@@ -19,15 +15,7 @@ const stageEl = document.querySelector('.stage');
 // ========================================
 // The Economy
 // ========================================
-/*
- * The whole game runs on a small budget: four hands and three shakes per
- * round. Every hand is therefore a question — bank the safe pair now, or
- * spend a shake fishing for the triples and straights that actually pay?
- * The targets are tuned so that settling for pairs loses by a breath: the
- * gamble is not optional, it is the price of admission. Pairs are grind
- * money; the big multipliers on rare hands are what the shaking is for.
- */
-const ROUNDS = [400, 1100, 2200];   /* target score per round — each round must out-gamble the last */
+const ROUNDS = [500, 1000, 1500];   // Independent per-round score targets.
 const HANDS = 4;                    /* plays per round */
 const SHAKES = 3;                   /* rerolls per round */
 const PIP_CHIPS = 5;                /* chips per pip */
@@ -191,7 +179,7 @@ function detect(vals, indices = vals.map((_, i) => i)) {
   const result = (key, members) => {
     const ordered = [...members].sort((a, b) => a.index - b.index);
     return { key, scoringIndices: ordered.map(d => d.index),
-             scoringValues: ordered.map(d => d.value), sum: ordered.reduce((sum, d) => sum + d.value, 0) };
+             scoringValues: ordered.map(d => d.value) };
   };
   const matching = len => faces.find(v => groups.get(v).length >= len);
   const straight = len => {
@@ -271,13 +259,7 @@ function renderDice() {
 // ========================================
 // Rolling & The Shake
 // ========================================
-/*
- * Holding space (or the table) rattles the loose dice in three
- * accelerating tiers, then releases them into a tumbling roll. Only
- * unselected dice reroll — that asymmetry is the whole gamble: lock what
- * you like, risk the rest. Every roll re-keys the music box to whatever
- * the new table looks like.
- */
+/* Hold mutates TAPE and rattles loose dice in three tiers; release rerolls only loose dice. */
 function rollDice(which, done) {
   S.rolling = true;
   try { Sound.rollRattle(0.8); } catch (e) {}
@@ -405,6 +387,7 @@ function countScore(from, to, handKey) {
     v = Math.min(to, v + Math.max(1, Math.ceil((to - from) / 22)));
     S.score = v; els.score.textContent = v; updateProgress();
     if (v >= to) {
+      S.runScore += to - from;   // Count each completed payout once; no second animation.
       els.score.classList.add('bump');
       els.prog.classList.add('flash');
       later(() => { els.score.classList.remove('bump'); els.prog.classList.remove('flash'); }, 400);
@@ -447,17 +430,12 @@ function nextHand() {
 // ========================================
 // Rounds & Endings
 // ========================================
-/*
- * Three targets, each steeper than the last. Clear one and the table
- * "warms up" for the next; run out of hands and the run ends on the end
- * card — score, round, and the best hand of the run. Winning all three
- * is a "clean sweep"; falling short is a "short stack".
- */
+/* Round score/resources reset between rounds; run total, last hand and TAPE persist. */
 function newGame() {
   timers.forEach(clearTimeout); timers = [];
   counting = false;
   resetShake();
-  S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, hands: HANDS,
+  S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, runScore: 0, hands: HANDS,
         shakes: SHAKES, d: [null, null, null, null, null, null],
         vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null, lastHandKey: null };
   els.end.classList.remove('show');
@@ -483,8 +461,8 @@ function roundClear() {
   later(() => {
     S.round++;
     S.target = ROUNDS[S.round];
+    S.score = 0;
     S.hands = HANDS; S.shakes = SHAKES;
-    S.lastHandKey = null;   /* The first PLAY of each round is fresh. */
     renderMeta();
     nextHand();
   }, 1600);
@@ -494,7 +472,7 @@ function gameOver(won) {
   S.phase = 'OVER';
   try { if (won) Sound.winChord(); else Sound.loseFall(); } catch (e) {}
   els.endName.textContent = won ? '\u201Cclean sweep\u201D' : '\u201Cshort stack\u201D';
-  els.endStats.textContent = 'score ' + S.score + ' / ' + S.target + ' · round ' + (S.round + 1) + ' of ' + ROUNDS.length;
+  els.endStats.textContent = 'run score ' + S.runScore + '\nround ' + (S.round + 1) + ' of ' + ROUNDS.length + ' · ' + S.score + ' / ' + S.target;
   els.endBest.innerHTML = 'best hand — <span>' + S.best.name + ' · ' + S.best.gain + '</span>';
   later(() => els.end.classList.add('show'), won ? 900 : 1200);
 }

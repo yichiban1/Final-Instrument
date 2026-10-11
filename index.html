@@ -22,7 +22,7 @@
   <div class="main">
     <aside class="combos">
       <div class="rail-score">
-        <span class="cap">score</span>
+        <span class="cap">round score</span>
         <span class="big" id="scoreEl">0</span>
         <span class="target" id="targetEl">/ 500</span>
         <div class="progress"><div class="fill" id="progFill"></div></div>
@@ -40,7 +40,7 @@
           </div>
           <div class="tape-slots" id="tapeSlots" aria-hidden="true" title="01 newest · 03 oldest · roles follow age">
             <span class="tslot t1"><span class="tape-role">lead</span><span class="tape-position">01</span><span class="tape-segments"></span></span>
-            <span class="tslot t2"><span class="tape-role">harm</span><span class="tape-position">02</span><span class="tape-segments"></span></span>
+            <span class="tslot t2"><span class="tape-role">harmony</span><span class="tape-position">02</span><span class="tape-segments"></span></span>
             <span class="tslot t3"><span class="tape-role">bed</span><span class="tape-position">03</span><span class="tape-segments"></span></span>
           </div>
           <div class="tape-line" aria-hidden="true"><span class="playhead"></span></div>
@@ -65,7 +65,6 @@
       </div>
     </main>
   </div>
-  <footer class="variant-tag">assignment 3 base · the looper in the left rail</footer>
 </div>
 
 <div class="end" id="end">
@@ -86,8 +85,8 @@
     <div class="help-sec">how to play</div>
     <div class="help-row"><span class="help-key">click · 1–6</span><span>lock a die in, click again to release. every pick strums the dice you hold.</span></div>
     <div class="help-row"><span class="help-key">space · table</span><span>hold to mutate stored TAPE: wobble → chop → break. release to reroll loose dice; locks stay. costs one shake.</span></div>
-    <div class="help-row"><span class="help-key">enter · play</span><span>bank the selected hand for chips &times; mult, toward the round target.</span></div>
-    <div class="help-row"><span class="help-key">repeat rule</span><span>play the same hand type twice in a row: &minus;1 Mult (minimum &times;1). change types to restore full value; each round starts fresh.</span></div>
+    <div class="help-row"><span class="help-key">enter · play</span><span>bank the selected hand for chips &times; mult toward this round&rsquo;s target. round score resets each round; run total stays.</span></div>
+    <div class="help-row"><span class="help-key">repeat rule</span><span>play the same hand type twice in a row: &minus;1 Mult (minimum &times;1). change types to restore full value; only a new game resets repetition.</span></div>
     <div class="help-sec">how it sings</div>
     <p class="help-lede">roll = generate · lock = compose · shake = mutate · play = commit · tape = memory</p>
     <div class="help-row"><span class="help-key">every roll</span><span>re-keys the bed to the hand lying on the table — a pair is a bare fifth, a full house a thick stack. rarer hand, bigger chord.</span></div>

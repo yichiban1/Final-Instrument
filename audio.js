@@ -90,14 +90,13 @@ const Sound = (() => {
     if (currentTake.length > 24) currentTake.shift();
     tapeChanged();
   }
-  function commitTake() {                          /* bank the scratch take into memory — PLAY only; returns memory count */
+  function commitTake() {                          /* Bank the scratch take on settled PLAY. */
     if (currentTake.length) {
       committedTakes.unshift(currentTake);
       if (committedTakes.length > 3) committedTakes.pop();
       currentTake = [];
       tapeChanged();
     }
-    return committedTakes.length;
   }
   function resetMemory() {
     setShakeMutation(0);
@@ -105,7 +104,6 @@ const Sound = (() => {
     if (on) rebuildPlayback();   /* Dispose queued notes and room tails from the old run. */
     tapeChanged();
   }
-  const getMemoryCount = () => committedTakes.length;
 
   /* the table's harmony: straights root on their low end, everything else roots
      on the most repeated die — a pair of 4s literally re-keys the bed onto D */
@@ -135,13 +133,8 @@ const Sound = (() => {
   // ========================================
   // One Instrument
   // ========================================
-  /*
-   * Everything shares one music-box timbre: soft sine plucks through
-   * separate rooms for live notes and tape. Bass, chords, melody and punctuation are just
-   * registers of that one voice. One timbre keeps the whole game sounding
-   * like a single object speaking, rather than an orchestra of unrelated
-   * sound effects competing for attention.
-   */
+  /* One sine-pluck timbre. LIVE has its own room; committed layers have separate rooms
+     feeding the shared TAPE mutation stage. */
   async function init() {
     if (on) return;
     if (starting) return starting;
@@ -373,6 +366,6 @@ const Sound = (() => {
   const mute = m => { if (on) master.mute = m; };
   return { init, setBed, setLocks, pick, unpick, confirm, invalid,
            handNotes, countTick, multHit, respond, winChord, loseFall,
-           rollRattle, tick, mute, commitTake, resetMemory, getMemoryCount,
+           rollRattle, tick, mute, commitTake, resetMemory,
            getTapeState, onTapeChange, setShakeMutation };
 })();
