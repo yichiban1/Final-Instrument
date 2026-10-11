@@ -9,7 +9,7 @@ const els = {
   table: $('table'), dice: $('diceMount'), stamp: $('stampLayer'),
   msg: $('msg'), score: $('scoreEl'), target: $('targetEl'),
   hands: $('handsEl'), rerolls: $('rerollsEl'), round: $('roundEl'),
-  pName: $('pName'), pMath: $('pMath'), playBtn: $('playBtn'), prog: $('progFill'),
+  pName: $('pName'), pMath: $('pMath'), repeat: $('repeatNotice'), playBtn: $('playBtn'), prog: $('progFill'),
   tape: $('tape'),
   comboList: $('comboList'), end: $('end'), endName: $('endName'),
   endStats: $('endStats'), help: $('help'), endBest: $('endBest'),
@@ -107,11 +107,20 @@ function renderPreview() {
   if (!c) {
     els.pName.textContent = '—';
     els.pMath.textContent = '';
+    renderRepeat();
     return;
   }
-  const { chips, mult } = scoreBreakdown(c);
+  const breakdown = scoreBreakdown(c);
+  const { chips, mult } = breakdown;
   els.pName.textContent = TYPES[c.key].name;
   els.pMath.textContent = chips + ' × ' + mult;
+  renderRepeat(breakdown);
+}
+function renderRepeat({ repeatPenalty = 0, baseMult, mult } = {}) {
+  els.repeat.hidden = !repeatPenalty;
+  els.repeat.textContent = repeatPenalty ? (mult === baseMult ? 'REPEAT · MIN ×1' : 'REPEAT · -1 MULT') : '';
+  els.repeat.title = repeatPenalty ? 'Consecutive hand: base ×' + baseMult + ' → scoring ×' + mult + '; minimum ×1' : '';
+  els.repeat.classList.remove('settling');
 }
 const msg = t => els.msg.textContent = t;
 
@@ -221,10 +230,12 @@ function currentCombo() {
   return detect(indices.map(i => S.d[i]), indices);
 }
 function scoreBreakdown(c) {
-  const { base, mult } = TYPES[c.key];
+  const { base, mult: baseMult } = TYPES[c.key];
+  const repeatPenalty = c.key === S.lastHandKey ? 1 : 0;
+  const mult = Math.max(1, baseMult - repeatPenalty);
   const contributions = c.scoringIndices.map((index, i) => ({ index, chips: c.scoringValues[i] * PIP_CHIPS }));
   const chips = base + contributions.reduce((sum, d) => sum + d.chips, 0);
-  return { base, mult, contributions, chips, gain: chips * mult };
+  return { base, baseMult, mult, repeatPenalty, contributions, chips, gain: chips * mult };
 }
 
 // ========================================
@@ -356,18 +367,20 @@ function playHand(c) {
   counting = true;
   els.playBtn.disabled = true;   /* no re-triggers while the score counts up */
   const t = TYPES[c.key];
-  const { base, mult, contributions, gain } = scoreBreakdown(c);
+  const breakdown = scoreBreakdown(c);
+  const { base, baseMult, mult, repeatPenalty, contributions, gain } = breakdown;
   if (!S.best || gain > S.best.gain) S.best = { name: t.name, gain };
   dice.forEach(({ d }, i) => d.classList.toggle('non-scoring', S.d[i] !== null && !c.scoringIndices.includes(i)));
   els.pName.textContent = t.name;
   els.pMath.textContent = base + ' × ' + mult;
+  renderRepeat(breakdown);
 
-  const tier = t.mult >= 6 ? 'high' : t.mult >= 3 ? 'med' : 'low';   /* visual intensity tier from the multiplier */
+  const tier = baseMult >= 6 ? 'high' : baseMult >= 3 ? 'med' : 'low';   /* Rarity follows the hand, never the scoring penalty. */
   stageEl.classList.add('fx-' + tier, 'impact');
   later(() => stageEl.classList.remove('impact'), 420);
 
   try { Sound.handNotes(c.scoringValues, c.key, tier); } catch (e) { /* audio must never block the game */ }
-  stamp(t.name.toUpperCase(), t.mult >= 4 ? 'gold' : '');
+  stamp(t.name.toUpperCase(), baseMult >= 4 ? 'gold' : '');
 
   let shown = base;
   contributions.forEach(({ index, chips }, k) => later(() => {
@@ -379,13 +392,14 @@ function playHand(c) {
     try { Sound.countTick(k); } catch (e) {}
   }, 180 + k * 180));
   later(() => {
+    if (repeatPenalty) els.repeat.classList.add('settling');   /* One quiet emphasis at the existing Mult landing. */
     try { Sound.multHit(); } catch (e) {}
     els.pMath.classList.add('punch');
     later(() => els.pMath.classList.remove('punch'), 300);
-    countScore(S.score, S.score + gain);
+    countScore(S.score, S.score + gain, c.key);
   }, 180 + contributions.length * 180 + 120);
 }
-function countScore(from, to) {
+function countScore(from, to, handKey) {
   let v = from;
   const step = () => {
     v = Math.min(to, v + Math.max(1, Math.ceil((to - from) / 22)));
@@ -395,13 +409,14 @@ function countScore(from, to) {
       els.prog.classList.add('flash');
       later(() => { els.score.classList.remove('bump'); els.prog.classList.remove('flash'); }, 400);
       counting = false;
-      afterPlay();
+      afterPlay(handKey);
     } else later(step, 40);
   };
   later(step, 40);
 }
-function afterPlay() {
+function afterPlay(handKey) {
   try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
+  S.lastHandKey = handKey;   /* Only a settled PLAY updates repetition memory. */
   renderTape();
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
   S.hands--; renderMeta();
@@ -409,6 +424,7 @@ function afterPlay() {
   dice.forEach(({ d }) => d.classList.remove('fired', 'non-scoring'));
   els.pMath.classList.remove('chip-hit', 'punch');
   els.pName.textContent = '—'; els.pMath.textContent = '';
+  renderRepeat();
   document.querySelectorAll('.crow').forEach(r => r.classList.remove('on'));
   stageEl.classList.remove('fx-low', 'fx-med', 'fx-high');
   if (S.score >= S.target) { roundClear(); return; }
@@ -443,7 +459,7 @@ function newGame() {
   resetShake();
   S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, hands: HANDS,
         shakes: SHAKES, d: [null, null, null, null, null, null],
-        vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null };
+        vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null, lastHandKey: null };
   els.end.classList.remove('show');
   els.endBest.textContent = '';
   els.stamp.innerHTML = '';
@@ -468,6 +484,7 @@ function roundClear() {
     S.round++;
     S.target = ROUNDS[S.round];
     S.hands = HANDS; S.shakes = SHAKES;
+    S.lastHandKey = null;   /* The first PLAY of each round is fresh. */
     renderMeta();
     nextHand();
   }, 1600);

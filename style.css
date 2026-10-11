@@ -314,6 +314,13 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   transition: transform .15s, text-shadow .15s;
 }
 .pmath.hot { transform: scale(1.22); text-shadow: 0 0 28px rgba(205, 187, 114, .55); }
+.repeat-line { display: flex; align-items: center; justify-content: center; min-height: 18px; max-width: 100%; }
+.repeat-notice {
+  font-size: 9px; letter-spacing: .14em; padding: 2px 7px; color: var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 2px;
+}
+.repeat-notice[hidden] { display: none; }
+.repeat-notice.settling { color: var(--gold-hi); border-color: var(--gold); background: rgba(205, 187, 114, .08); }
 .msg { min-height: 24px; max-width: 100%; margin: 10px 0 14px; font-style: italic; font-size: 14px; letter-spacing: .07em; color: var(--ink-dim); text-align: center; }
 
 /* ---------- controls ---------- */
