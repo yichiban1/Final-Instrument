@@ -548,6 +548,43 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .crow { padding-block: 5px; }
 }
 
+/* ---------- Medium: 720–839px narrow desktop windows ---------- */
+@media (720px <= width < 840px) {
+  .table { padding: 14px; }
+  .main { gap: 16px; }
+  .combos { width: 240px; padding: 10px; gap: 8px; }
+  .rail-score { gap: 4px 10px; }
+  .rail-score .big { font-size: 40px; }
+  .rail-score .target { font-size: 15px; }
+  .rail-meta { gap: 10px; padding: 2px 4px 6px; }
+  .meta .mval { width: 32px; height: 32px; font-size: 15px; }
+  .rail-tape { padding: 7px; }
+  .rail-tape .rail-cap { gap: 6px; margin-bottom: 4px; font-size: 11px; letter-spacing: .12em; }
+  .tape-track { gap: 4px; }
+  .tape-slots { gap: 3px; }
+  .tslot { grid-template-columns: 62px 28px minmax(0, 1fr); gap: 5px; min-height: 18px; }
+  .tape-role, .tape-position { font-size: 11px; }
+  .tape-depth, .tape-mutation { font-size: 9px; letter-spacing: .04em; }
+  .tape-segments { gap: 2px; }
+  .tape-segments span { height: 8px; }
+  .tape-live { padding-bottom: 4px; }
+  .crow { padding: 4px; }
+  .crow-top, .crow .cname { gap: 5px; }
+  .crow .cname { font-size: 11.5px; letter-spacing: .02em; }
+  .crow.on .cname { font-size: 12.5px; }
+  .crow .cmath, .crow.on .cmath { font-size: 10.5px; letter-spacing: .04em; }
+  .dice { gap: 12px; margin-bottom: 22px; max-width: 100%; }
+  .die { width: clamp(50px, 7vw, 58px); height: clamp(50px, 7vw, 58px); border-radius: 11px; }
+  .preview { gap: 10px; }
+  .pname { font-size: 22px; }
+  .pmath { font-size: 30px; }
+  .msg { font-size: 12px; letter-spacing: .04em; }
+  .controls { gap: 10px; }
+  .playbtn { font-size: 13px; letter-spacing: .24em; padding: 10px 24px; }
+  .controls .hint { font-size: 9px; line-height: 1.4; letter-spacing: .1em; padding: 6px 10px; }
+  .stamp { font-size: 26px; letter-spacing: .12em; padding-inline: 12px; }
+}
+
 /* ---------- reduced motion: the room goes still, the game stays readable ---------- */
 @media (prefers-reduced-motion: reduce) {
   body::after, .playbtn:not(:disabled),
