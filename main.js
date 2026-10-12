@@ -457,7 +457,7 @@ function roundClear() {
   try { Sound.winChord(); } catch (e) {}
   if (S.round >= ROUNDS.length - 1) { gameOver(true); return; }
   stamp('ROUND CLEAR', 'gold');
-  msg('the table warms up — next target coming');
+  msg('soundtrack carries forward — next round');
   later(() => {
     S.round++;
     S.target = ROUNDS[S.round];
