@@ -38,7 +38,7 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 /* ---------- hud ---------- */
 .hud { display: flex; justify-content: space-between; align-items: baseline; }
 .brand-lockup { display: flex; align-items: baseline; gap: 12px; }
-.brand-descriptor { font-size: 9px; line-height: 1.2; letter-spacing: .08em; color: var(--ink-dim); white-space: nowrap; }
+.brand-descriptor { font-size: 11px; line-height: 1.2; letter-spacing: .08em; color: var(--ink-dim); white-space: nowrap; }
 .brand { position: relative; font-size: 22px; font-style: italic; letter-spacing: .18em; }
 .brand::after {  /* the gold swash under the wordmark, set slightly crooked on purpose */
   content: ""; display: block; width: 72%; height: 2px; margin-top: 2px;
@@ -125,22 +125,36 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
 /* ---------- tape: the loop memory, made visible ---------- */
 /* Age assigns the role; segments show approximate replay density. */
 .rail-tape {
+  --tape-label: 76px; --tape-position: 30px; --tape-gap: 8px; --tape-row: 21px;
   position: relative; padding: 9px 12px; border: 1px solid rgba(205, 187, 114, .24); border-radius: 3px;
   background: linear-gradient(180deg, rgba(205, 187, 114, .035), rgba(0, 0, 0, .08));
 }
-.rail-tape .rail-cap { display: flex; margin-bottom: 6px; font-size: 13px; letter-spacing: .18em; color: var(--gold); }
+.rail-tape .rail-cap { display: flex; gap: 4px; margin-bottom: 6px; font-size: 13px; letter-spacing: .18em; color: var(--gold); white-space: nowrap; }
 .rail-tape .rail-cap::after { display: none; }
-.tape-track { display: flex; flex-direction: column; gap: 5px; }
+.tape-track { position: relative; display: flex; flex-direction: column; gap: 5px; }
 .tape-slots { display: grid; gap: 5px; }
 .tslot {
-  display: grid; grid-template-columns: 76px 30px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 21px;
+  display: grid; grid-template-columns: var(--tape-label) var(--tape-position) minmax(0, 1fr); align-items: center; gap: var(--tape-gap); min-height: var(--tape-row);
   color: var(--ink-dim); transition: color .3s;
 }
 .tape-role { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
 .tape-depth { margin-left: auto; font-size: 10px; letter-spacing: .05em; color: var(--ink-dim); }
-.tape-mutation { font-size: 10px; letter-spacing: .06em; color: var(--gold); }
-.tape-mutation:empty { display: none; }
-.tape-memory { position: absolute; right: 8px; bottom: 0; font-size: 7px; line-height: 7px; letter-spacing: .08em; color: var(--ink-dim); }
+.tape-memory { font-size: 10px; font-style: italic; text-transform: none; letter-spacing: 0; color: var(--ink-dim); }
+/* Commit occupies empty scratch segments; mutation belongs to the TAPE border. */
+.tape-mutation, .tape-commit {
+  position: absolute; top: 0; height: var(--tape-row); display: flex; align-items: center;
+  font-size: 10px; letter-spacing: .04em; color: var(--gold); pointer-events: none;
+}
+.tape-mutation { top: auto; right: 8px; bottom: -5px; height: 10px; padding-inline: 4px; background: var(--felt-lo); }
+.tape-commit {
+  right: 0; left: calc(var(--tape-label) + var(--tape-position) + 2 * var(--tape-gap));
+  z-index: 1; justify-content: center; white-space: nowrap; background: var(--felt-lo); color: var(--gold-hi);
+}
+.tape-mutation:empty, .tape-commit:empty { display: none; }
+.tslot.commit-lead { color: var(--gold-hi); background: rgba(205, 187, 114, .07); animation: tapeCommit .75s ease-out; }
+.tslot.commit-deeper { animation: tapeDeepen .75s ease-out; }
+@keyframes tapeCommit { 30% { filter: brightness(1.3); } }
+@keyframes tapeDeepen { 25% { opacity: .55; } }
 /* The gesture marks committed memory only; the LIVE row stays immediate. */
 .rail-tape[data-mutation="1"] { --mutation-pulse: .75s; --mutation-dim: .82; }
 .rail-tape[data-mutation="2"] { --mutation-pulse: .1875s; --mutation-dim: .45; }
@@ -561,11 +575,10 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .rail-score .target { font-size: 15px; }
   .rail-meta { gap: 10px; padding: 2px 4px 6px; }
   .meta .mval { width: 32px; height: 32px; font-size: 15px; }
-  .rail-tape { padding: 7px; }
-  .rail-tape .rail-cap { gap: 6px; margin-bottom: 4px; font-size: 11px; letter-spacing: .12em; }
+  .rail-tape { --tape-label: 62px; --tape-position: 28px; --tape-gap: 5px; --tape-row: 18px; padding: 7px; }
+  .rail-tape .rail-cap { margin-bottom: 4px; font-size: 11px; letter-spacing: .12em; }
   .tape-track { gap: 4px; }
   .tape-slots { gap: 3px; }
-  .tslot { grid-template-columns: 62px 28px minmax(0, 1fr); gap: 5px; min-height: 18px; }
   .tape-role, .tape-position { font-size: 11px; }
   .tape-depth, .tape-mutation { font-size: 9px; letter-spacing: .04em; }
   .tape-segments { gap: 2px; }
@@ -596,7 +609,8 @@ body::after {  /* lamp vignette — it breathes, very slowly, like a real bulb *
   .rail-score .big.bump, .progress .fill.flash { animation: none; }
   .rail-tape.live .playhead { animation: none; opacity: .45; }   /* static marker, no sweep */
   .rail-tape[data-mutation] .tape-slots .on .tape-segments,
+  .tslot.commit-lead, .tslot.commit-deeper,
   .die-wrap.w1 .die, .die-wrap.w2 .die, .die-wrap.w3 .die,
   .die-wrap.w3 .shadow { animation: none; }
-  .die, .shadow, .playbtn, .ghost, .crow, .meta .mval::before { transition-duration: .01s; }
+  .die, .shadow, .playbtn, .ghost, .crow, .tslot, .meta .mval::before { transition-duration: .01s; }
 }

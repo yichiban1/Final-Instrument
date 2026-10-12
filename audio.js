@@ -96,7 +96,9 @@ const Sound = (() => {
       if (committedTakes.length > 3) committedTakes.pop();
       currentTake = [];
       tapeChanged();
+      return true;
     }
+    return false;
   }
   function resetMemory() {
     setShakeMutation(0);

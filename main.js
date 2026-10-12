@@ -130,6 +130,7 @@ function fxClear() {   /* strip every one-shot feedback class */
 const tapeSlots = document.querySelectorAll('#tapeSlots .tslot');
 const tapeLive = $('tapeLive');
 const tapeMutation = $('tapeMutation');
+const tapeCommit = $('tapeCommit');
 const MUTATION_NAMES = ['', 'WOBBLE', 'CHOP', 'BREAK'];
 [tapeLive, ...tapeSlots].forEach(row => {
   const line = row.querySelector('.tape-segments');
@@ -157,6 +158,18 @@ function renderTape() {   /* Counts and the gesture tier cross the audio / UI bo
     (state.shakeTier ? '; memory mutation ' + MUTATION_NAMES[state.shakeTier] : ''));
 }
 try { Sound.onTapeChange(renderTape); } catch (e) {}
+function clearTapeCommit() {
+  tapeCommit.textContent = '';
+  tapeSlots.forEach(row => row.classList.remove('commit-lead', 'commit-deeper'));
+}
+function showTapeCommit() {
+  tapeCommit.textContent = 'REC → LEAD';
+  tapeSlots[0].classList.add('commit-lead');
+  tapeSlots.forEach((row, i) => {
+    if (i && row.classList.contains('on')) row.classList.add('commit-deeper');
+  });
+  later(clearTapeCommit, 750);
+}
 function stamp(text, cls = '') {
   const s = document.createElement('div');
   s.className = 'stamp ' + cls; s.textContent = text;
@@ -398,7 +411,8 @@ function countScore(from, to, handKey) {
   later(step, 40);
 }
 function afterPlay(handKey) {
-  try { Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
+  let committed = false;
+  try { committed = Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
   S.lastHandKey = handKey;   /* Only a settled PLAY updates repetition memory. */
   renderTape();
   try { Sound.respond(); } catch (e) {}   /* the bed answers the hand that just banked */
@@ -410,11 +424,13 @@ function afterPlay(handKey) {
   renderRepeat();
   document.querySelectorAll('.crow').forEach(r => r.classList.remove('on'));
   stageEl.classList.remove('fx-low', 'fx-med', 'fx-high');
-  if (S.score >= S.target) { roundClear(); return; }
-  if (S.hands <= 0) { gameOver(false); return; }
-  nextHand();
+  if (S.score >= S.target) roundClear();
+  else if (S.hands <= 0) gameOver(false);
+  else nextHand();
+  if (committed) showTapeCommit();   /* Overlap the transition without extending it. */
 }
 function nextHand() {
+  clearTapeCommit();
   resetShake();
   S.d = [null, null, null, null, null, null];
   S.phase = 'ROLL';
@@ -433,6 +449,7 @@ function nextHand() {
 /* Round score/resources reset between rounds; run total, last hand and TAPE persist. */
 function newGame() {
   timers.forEach(clearTimeout); timers = [];
+  clearTapeCommit();
   counting = false;
   resetShake();
   S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, runScore: 0, hands: HANDS,
@@ -452,6 +469,7 @@ function newGame() {
   nextHand();
 }
 function roundClear() {
+  clearTapeCommit();
   resetShake();
   S.phase = 'BETWEEN';
   try { Sound.winChord(); } catch (e) {}
@@ -468,6 +486,7 @@ function roundClear() {
   }, 1600);
 }
 function gameOver(won) {
+  clearTapeCommit();
   resetShake();
   S.phase = 'OVER';
   try { if (won) Sound.winChord(); else Sound.loseFall(); } catch (e) {}
