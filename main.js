@@ -11,6 +11,45 @@ const els = {
   endStats: $('endStats'), help: $('help'), endBest: $('endBest'),
 };
 const stageEl = document.querySelector('.stage');
+const helpBtn = $('helpBtn'), helpClose = $('helpClose'), againBtn = $('againBtn');
+const helpIsOpen = () => els.help.classList.contains('show');
+const endIsOpen = () => els.end.classList.contains('show');
+const overlayIsOpen = () => helpIsOpen() || endIsOpen();
+
+/* These two cards own input and focus while visible; hidden cards stay inert. */
+function syncOverlayFocus() {
+  els.help.inert = !helpIsOpen();
+  els.end.inert = !endIsOpen();
+  els.table.inert = overlayIsOpen();
+  helpBtn.setAttribute('aria-expanded', String(helpIsOpen()));
+}
+function openHelp() {
+  if (endIsOpen()) return;
+  resetShake();
+  els.help.classList.add('show');
+  syncOverlayFocus();
+  helpClose.focus();
+}
+function closeHelp(restoreFocus = true) {
+  if (!helpIsOpen()) return;
+  els.help.classList.remove('show');
+  syncOverlayFocus();
+  if (restoreFocus && !endIsOpen()) helpBtn.focus({ preventScroll: true });
+}
+function openEnd() {
+  closeHelp(false);   /* A pending payout may finish while Help is being read. */
+  els.end.classList.add('show');
+  syncOverlayFocus();
+  later(() => {
+    if (endIsOpen()) againBtn.focus({ preventScroll: true });
+  }, 500);   /* Focus the action after the existing fade-in. */
+}
+function closeEnd() {
+  const wasOpen = endIsOpen();
+  els.end.classList.remove('show');
+  syncOverlayFocus();
+  if (wasOpen) helpBtn.focus({ preventScroll: true });
+}
 
 // ========================================
 // The Economy
@@ -249,7 +288,7 @@ function scoreBreakdown(c) {
  * and swallowed: a broken speaker must never be able to break the game.
  */
 function toggleSelect(i) {
-  if (!S || S.rolling || counting || S.phase !== 'PLAY') return;
+  if (!S || S.rolling || counting || S.phase !== 'PLAY' || overlayIsOpen()) return;
   const before = currentCombo();
   try {
     if (S.d[i] === null) { S.d[i] = S.vals[i]; Sound.pick(S.vals[i], selected()); }
@@ -309,7 +348,7 @@ function resetShake() {   /* Cancel the gesture without spending a shake or rero
   return !!active;
 }
 function startShake(source = 'keyboard', pointerId = null) {
-  if (!S || S.rolling || counting || S.phase !== 'PLAY' || hold || els.help.classList.contains('show')) return;
+  if (!S || S.rolling || counting || S.phase !== 'PLAY' || hold || overlayIsOpen()) return;
   if (S.shakes <= 0) { resetShake(); msg('no shakes left — play what you hold'); return; }
   const loose = [];
   S.d.forEach((v, i) => { if (v === null) loose.push(i); });
@@ -351,7 +390,7 @@ function releaseShake() {
 // ========================================
 /* Base chips → scoring dice → multiplier → score. All stages cancel on restart. */
 els.playBtn.addEventListener('click', () => {
-  if (!S || S.rolling || counting || S.phase !== 'PLAY') return;
+  if (!S || S.rolling || counting || S.phase !== 'PLAY' || overlayIsOpen()) return;
   const c = currentCombo();
   if (!c) { Sound.invalid(); msg('select a die to play'); return; }
   playHand(c);
@@ -455,7 +494,7 @@ function newGame() {
   S = { phase: 'ROLL', round: 0, target: ROUNDS[0], score: 0, runScore: 0, hands: HANDS,
         shakes: SHAKES, d: [null, null, null, null, null, null],
         vals: [1, 2, 3, 4, 5, 6], rolling: false, best: null, lastHandKey: null };
-  els.end.classList.remove('show');
+  closeEnd();
   els.endBest.textContent = '';
   els.stamp.innerHTML = '';
   fxClear();
@@ -493,7 +532,7 @@ function gameOver(won) {
   els.endName.textContent = won ? '\u201Cclean sweep\u201D' : '\u201Cshort stack\u201D';
   els.endStats.textContent = 'run score ' + S.runScore + '\nround ' + (S.round + 1) + ' of ' + ROUNDS.length + ' · ' + S.score + ' / ' + S.target;
   els.endBest.innerHTML = 'best hand — <span>' + S.best.name + ' · ' + S.best.gain + '</span>';
-  later(() => els.end.classList.add('show'), won ? 900 : 1200);
+  later(openEnd, won ? 900 : 1200);
 }
 
 // ========================================
@@ -524,17 +563,39 @@ window.addEventListener('blur', resetShake);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetShake(); });
 const KEY_DIE = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5,
                   Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5 };
+const dialogKeys = new Set();   /* A button activation owns its key until release. */
 window.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !e.repeat) { e.preventDefault(); startShake(); }
-  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !els.playBtn.disabled) els.playBtn.click();
+  if (dialogKeys.has(e.code)) { e.preventDefault(); return; }
+  if (e.code === 'Escape' && helpIsOpen()) { e.preventDefault(); closeHelp(); return; }
+  if (e.key === '?' && !e.repeat) {
+    e.preventDefault();
+    if (helpIsOpen()) closeHelp(); else openHelp();
+    return;
+  }
+  if (overlayIsOpen()) {
+    if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') dialogKeys.add(e.code);
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      (helpIsOpen() ? helpClose : againBtn).focus({ preventScroll: true });
+    }
+    return;   /* Enter/Space may activate the dialog's button, never the instrument. */
+  }
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) startShake(); }
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    e.preventDefault();   /* Avoid also activating a focused Help/Sound button. */
+    if (!els.playBtn.disabled) els.playBtn.click();
+  }
   if (KEY_DIE[e.code] !== undefined && !e.repeat) toggleSelect(KEY_DIE[e.code]);
-  if (e.key === '?' && !e.repeat) { resetShake(); els.help.classList.toggle('show'); }
-  if (e.code === 'Escape') els.help.classList.remove('show');
 });
-window.addEventListener('keyup', e => { if (e.code === 'Space' && hold?.source === 'keyboard') releaseShake(); });
+window.addEventListener('keyup', e => {
+  if (dialogKeys.delete(e.code)) return;
+  if (e.code === 'Space' && hold?.source === 'keyboard') releaseShake();
+});
+window.addEventListener('blur', () => dialogKeys.clear());
+document.addEventListener('visibilitychange', () => { if (document.hidden) dialogKeys.clear(); });
 
-$('helpBtn').addEventListener('click', () => { resetShake(); els.help.classList.toggle('show'); });
-$('helpClose').addEventListener('click', () => els.help.classList.remove('show'));
+helpBtn.addEventListener('click', () => { if (helpIsOpen()) closeHelp(); else openHelp(); });
+helpClose.addEventListener('click', () => closeHelp());
 
 const muteBtn = $('muteBtn');
 muteBtn.textContent = localStorage.getItem('rolling-sound') === 'off' ? 'sound off' : 'sound on';
@@ -547,7 +608,7 @@ muteBtn.addEventListener('click', () => {
 const wake = () => { Sound.init().then(() => Sound.mute(muteBtn.textContent === 'sound off')).catch(() => {}); };
 window.addEventListener('pointerdown', wake, { once: true });
 window.addEventListener('keydown', wake, { once: true });
-$('againBtn').addEventListener('click', newGame);
+againBtn.addEventListener('click', newGame);
 
 newGame();
 })();

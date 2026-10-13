@@ -16,7 +16,7 @@
       <span class="brand-descriptor">dice-driven dynamic soundtrack</span>
     </div>
     <div class="hud-right">
-        <button class="ghost" id="helpBtn">help</button>
+        <button class="ghost" id="helpBtn" aria-controls="help" aria-expanded="false">help</button>
         <button class="ghost" id="muteBtn">sound on</button>
       </div>
   </header>
@@ -72,7 +72,7 @@
   </div>
 </div>
 
-<div class="end" id="end">
+<div class="end" id="end" role="dialog" aria-modal="true" aria-labelledby="endName" inert>
   <div class="end-card">
     <div class="end-name" id="endName"></div>
     <div class="end-best" id="endBest"></div>
@@ -83,9 +83,9 @@
   </div>
 </div>
 
-<div class="help" id="help">
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="helpName" inert>
   <div class="help-card">
-    <div class="help-name">the dynamic soundtrack</div>
+    <div class="help-name" id="helpName">the dynamic soundtrack</div>
     <p class="help-lede">your actions make the music. committed hands become a soundtrack that loops beneath later play, settling from lead into harmony and bed.</p>
     <div class="help-sec">how to play</div>
     <div class="help-row"><span class="help-key">click · 1–6</span><span>lock a die in, click again to release. every pick strums the dice you hold.</span></div>
