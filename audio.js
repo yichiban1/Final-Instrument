@@ -63,6 +63,8 @@ const Sound = (() => {
     { cutoff: 950, depth: 0.94, rate: 36 / LOOP_LEN },  /* BREAK */
   ];
   let currentTake = [], committedTakes = [], loopStart = 0;
+  /* Take age selects LEAD (newest), HARMONY (middle), then BED (oldest).
+   * Quieter output and wetter, longer rooms place older takes further away. */
   const LAYERS = [
     { role: 'lead', transpose: 0, duration: 0.3, gain: 0.72, every: 1, wet: 0.08, decay: 0.8, output: 0.9 },
     { role: 'harmony', transpose: -12, duration: 0.48, gain: 0.43, every: 1, wet: 0.32, decay: 1.5, output: 0.8 },
@@ -123,7 +125,7 @@ const Sound = (() => {
     const root = PENT[rv - 1];
     return { root, tones: shape.map(k => deg(root, k)) };
   }
-  /* the fallback figure, drawn from the chord — order flips with every roll */
+  /* The fallback figure's order follows the current chord's pitch parity. */
   function boardMotif() {
     const t = chord.tones;
     if (t.length < 3) return (t[0] + t[1]) % 2 ? [t[0], t[1], t[0] + 12] : [t[1], t[0], t[1] + 12];
@@ -184,6 +186,9 @@ const Sound = (() => {
     tapeLFO.start();
     applyShakeMutation();
   }
+  /* Committed voices → individual rooms/output gains → shared filter/gate → master.
+   * LIVE scratch, performance notes and rarity echoes use their own room;
+   * UI/rattle sounds reach master separately, so Shake processes committed TAPE only. */
   function rebuildPlayback() {
     box?.dispose(); rev?.dispose();
     tapeBuses.forEach(bus => { bus.synth.dispose(); bus.room.dispose(); bus.output.dispose(); });
@@ -214,6 +219,8 @@ const Sound = (() => {
      * One loop of the player's own making, spinning under the live
      * action. Age assigns a playback role; stored events stay untouched.
      * The scratch take stays foreground until it is banked or wiped.
+     * Pitch, duration, gain and density changes apply when scheduling notes,
+     * preserving the recorded {at, midi, vel} entries.
      */
     new Tone.Loop(t => {
       loopStart = t;

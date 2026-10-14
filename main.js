@@ -100,8 +100,8 @@ for (let i = 0; i < 6; i++) {
 /*
  * The glossary:
  * one row per hand, always visible but quiet — a reminder of what exists,
- * not a hint about what you have. Descriptions only surface when a row is
- * hovered or played; reading the dice remains the player's job.
+ * with descriptions revealed on hover or when the current selection
+ * matches a hand. The preview shares the same detection used by PLAY.
  */
 TYPE_ORDER.forEach(k => {
   const t = TYPES[k], row = document.createElement('div');
@@ -175,6 +175,9 @@ const MUTATION_NAMES = ['', 'WOBBLE', 'CHOP', 'BREAK'];
   const line = row.querySelector('.tape-segments');
   for (let i = 0; i < 8; i++) line.appendChild(document.createElement('span'));
 });
+/* Sound supplies metadata for LIVE scratch and LEAD / HARMONY / BED memory.
+ * Segments approximate event density; the mutation label follows the engine's
+ * active tier. The UI reads audio state without owning or rewriting events. */
 function renderTape() {   /* Counts and the gesture tier cross the audio / UI boundary. */
   let state;
   try { state = Sound.getTapeState(); } catch (e) { return; }
@@ -220,6 +223,9 @@ function stamp(text, cls = '') {
 // Hand Detection
 // ========================================
 /* Strongest hand first; equal patterns prefer more pips, then earlier dice. */
+/* Detection returns the exact scoring indices and values for the chosen hand.
+ * Preview, payout highlights and payout notes share that result; unrelated
+ * selected dice contribute no chips or payout notes. */
 function detect(vals, indices = vals.map((_, i) => i)) {
   if (!vals.length) return null;
   const groups = new Map();
@@ -269,6 +275,9 @@ function currentCombo() {
   const indices = S.d.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
   return detect(indices.map(i => S.d[i]), indices);
 }
+/* lastHandKey discourages immediately repeating a hand type: -1 Mult, minimum ×1.
+ * A different type uses its normal Mult. Settled history survives hands and
+ * rounds; only newGame clears it. Preview and payout use this same breakdown. */
 function scoreBreakdown(c) {
   const { base, mult: baseMult } = TYPES[c.key];
   const repeatPenalty = c.key === S.lastHandKey ? 1 : 0;
@@ -311,6 +320,9 @@ function renderDice() {
 // ========================================
 // Rolling & The Shake
 // ========================================
+const SHAKE_CHOP_MS = 500;
+const SHAKE_BREAK_MS = 1200;
+
 /* Hold mutates TAPE and rattles loose dice in three tiers; release rerolls only loose dice. */
 function rollDice(which, done) {
   S.rolling = true;
@@ -360,7 +372,7 @@ function startShake(source = 'keyboard', pointerId = null) {
       resetShake(); return;
     }
     const el = performance.now() - hold.t0;
-    const tier = el < 260 ? 1 : el < 650 ? 2 : 3;
+    const tier = el < SHAKE_CHOP_MS ? 1 : el < SHAKE_BREAK_MS ? 2 : 3;
     if (tier !== hold.tier) {
       hold.tier = tier;
       try { Sound.setShakeMutation(tier); } catch (e) {}
@@ -389,6 +401,8 @@ function releaseShake() {
 // The Payout, Staged
 // ========================================
 /* Base chips → scoring dice → multiplier → score. All stages cancel on restart. */
+/* Only the detected hand's dice enter the staged payout; its final gain lands
+ * in round score, then joins run score once settlement completes. */
 els.playBtn.addEventListener('click', () => {
   if (!S || S.rolling || counting || S.phase !== 'PLAY' || overlayIsOpen()) return;
   const c = currentCombo();
@@ -449,6 +463,8 @@ function countScore(from, to, handKey) {
   };
   later(step, 40);
 }
+/* commitTake's boolean confirms non-empty musical material entered memory.
+ * A settled hand alone does not guarantee a recorded take or a REC → LEAD cue. */
 function afterPlay(handKey) {
   let committed = false;
   try { committed = Sound.commitTake(); } catch (e) {}   /* settlement done — bank the take */
@@ -468,6 +484,8 @@ function afterPlay(handKey) {
   else nextHand();
   if (committed) showTapeCommit();   /* Overlap the transition without extending it. */
 }
+/* A new hand clears locks and, after its roll, LIVE scratch. Committed TAPE,
+ * round/run scores and repetition history carry into the next hand. */
 function nextHand() {
   clearTapeCommit();
   resetShake();
@@ -486,6 +504,8 @@ function nextHand() {
 // Rounds & Endings
 // ========================================
 /* Round score/resources reset between rounds; run total, last hand and TAPE persist. */
+/* A new run cancels pending feedback and resets all run state, including
+ * repetition history and audio memory, before rolling its first hand. */
 function newGame() {
   timers.forEach(clearTimeout); timers = [];
   clearTapeCommit();
@@ -524,6 +544,8 @@ function roundClear() {
     nextHand();
   }, 1600);
 }
+/* End stops gameplay input but retains final scores, repetition and TAPE.
+ * Play Again performs the reset; reaching End does not erase the soundtrack. */
 function gameOver(won) {
   clearTapeCommit();
   resetShake();
